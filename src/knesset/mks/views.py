@@ -32,136 +32,34 @@ class MemberListView(ListView):
 
     def get_template_names(self):
         info = self.request.GET.get('info','bills_pre')
-        if info=='abc':
-            return ['mks/member_list.html']
-        elif info=='graph':
-            return ['mks/member_graph.html']
-        else:
-            return ['mks/member_list_with_bars.html']
+        return ['mks/member_radar.html']
 
     def get_context(self):
-        info = self.request.GET.get('info','bills_pre')
-        original_context = super(MemberListView, self).get_context()
-        qs = original_context['object_list'].filter(is_current=True)
-        context = cache.get('member_list_by_%s' % info) or {}
+        context = cache.get('member_radar') or False
         if context:
-            original_context.update(context)
-            return original_context
-        context['past_mks'] = original_context['past_mks']
-        
-        context['friend_pages'] = [['.?info=abc',_('By ABC'), False],
-                              ['.?info=bills_proposed',_('By number of bills proposed'), False],
-                              ['.?info=bills_pre',_('By number of bills pre-approved'), False],
-                              ['.?info=bills_first',_('By number of bills first-approved'), False],
-                              ['.?info=bills_approved',_('By number of bills approved'), False],
-                              ['.?info=votes', _('By number of votes per month'), False],
-                              ['.?info=presence', _('By average weekly hours of presence'), False],
-                              ['.?info=committees', _('By average monthly committee meetings'), False],
-                              ['.?info=graph', _('Graphical view'), False]]
-        if info=='abc':
-            context['friend_pages'][0][2] = True
-            context['title'] = _('Members')
-        elif info=='bills_proposed':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.bills.count()
-                x.bill_stage = 'proposed'
-            qs.sort(key=lambda x:x.extra, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.bills.count()
-                x.bill_stage = 'proposed'
-            context['past_mks'].sort(key=lambda x:x.extra, reverse=True)
-            context['friend_pages'][1][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By number of bills proposed'))
-        elif info=='bills_pre':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.bills.filter(Q(stage='2')|Q(stage='3')|Q(stage='4')|Q(stage='5')|Q(stage='6')).count()
-                x.bill_stage = 'pre'
-            qs.sort(key=lambda x:x.extra, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.bills.filter(Q(stage='2')|Q(stage='3')|Q(stage='4')|Q(stage='5')|Q(stage='6')).count()
-                x.bill_stage = 'pre'
-            context['past_mks'].sort(key=lambda x:x.extra, reverse=True)
-            context['friend_pages'][2][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By number of bills pre-approved'))
-        elif info=='bills_first':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.bills.filter(Q(stage='4')|Q(stage='5')|Q(stage='6')).count()
-                x.bill_stage = 'first'
-            qs.sort(key=lambda x:x.extra, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.bills.filter(Q(stage='4')|Q(stage='5')|Q(stage='6')).count()
-                x.bill_stage = 'first'
-            context['past_mks'].sort(key=lambda x:x.extra, reverse=True)
-            context['friend_pages'][3][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By number of bills first-approved'))
-        elif info=='bills_approved':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.bills.filter(stage='6').count()
-                x.bill_stage = 'approved'
-            qs.sort(key=lambda x:x.extra, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.bills.filter(stage='6').count()
-                x.bill_stage = 'approved'
-            context['past_mks'].sort(key=lambda x:x.extra, reverse=True)
-            context['friend_pages'][4][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By number of bills approved'))
-        elif info=='votes':
-            qs = list(qs)
-            vs = list(MemberVotingStatistics.objects.all())
-            vs = dict(zip([x.member_id for x in vs],vs))
-            for x in qs:
-                x.extra = vs[x.id].average_votes_per_month()
-            qs.sort(key=lambda x:x.extra, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.voting_statistics.average_votes_per_month()
-            context['past_mks'].sort(key=lambda x:x.extra, reverse=True)
-            context['friend_pages'][5][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By number of votes per month'))
-        elif info=='presence':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.average_weekly_presence()
-            qs.sort(key=lambda x:x.extra or 0, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.average_weekly_presence()
-            context['past_mks'].sort(key=lambda x:x.extra or 0, reverse=True)
-            context['friend_pages'][6][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By average weekly hours of presence'))
-        elif info=='committees':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.committee_meetings_per_month()
-            qs.sort(key=lambda x:x.extra or 0, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.committee_meetings_per_month()
-            context['past_mks'].sort(key=lambda x:x.extra or 0, reverse=True)
-            context['friend_pages'][7][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0            
-            context['title'] = "%s %s" % (_('Members'), _('By average monthly committee meetings'))
-        elif info=='graph':
-            context['friend_pages'][8][2] = True
-            context['title'] = "%s %s" % (_('Members'), _('Graphical view'))
-        context['object_list']=qs        
-        cache.set('member_list_by_%s' % info, context, 900)
-        original_context.update(context)
-        return original_context
+            return context
+        context = super(MemberListView, self).get_context()
+        qs = context['object_list'].filter(is_current=True)
+
+        members = []
+        vs = list(MemberVotingStatistics.objects.all())
+        vs = dict(zip([x.member_id for x in vs],vs))
+        for m in qs:
+            members.append(dict(
+                id = m.id,
+                url = m.get_absolute_url(),
+                bills_proposed = m.bills.count(),
+                bills_pre = m.bills.filter(Q(stage='2')|Q(stage='3')|Q(stage='4')|Q(stage='5')|Q(stage='6')).count(),
+                bills_first = m.bills.filter(Q(stage='4')|Q(stage='5')|Q(stage='6')).count(),
+                bills_approved = m.bills.filter(stage='6').count(),
+                votes = vs[m.id].average_votes_per_month(),
+                presence = m.average_weekly_presence(),
+                committees = m.committee_meetings_per_month(),
+            ))
+
+        context['members'] = members        
+        cache.set('member_radar', context, 900)
+        return context
 
 class MemberDetailView(DetailView):
 
