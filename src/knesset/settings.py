@@ -107,6 +107,7 @@ INSTALLED_APPS = (
     'backlinks.pingback',
     'backlinks.trackback',
     'django_nose',
+    'django_facebook',
     'knesset',
     'knesset.auxiliary',                  # knesset apps
     'knesset.mks',
@@ -130,8 +131,14 @@ TEMPLATE_CONTEXT_PROCESSORS = (
 "django.core.context_processors.i18n",
 "django.core.context_processors.media",
 "django.core.context_processors.request",
+"django_facebook.context_processors.facebook",
 "knesset.context.processor",
 )
+
+AUTHENTICATION_BACKENDS = (
+'django_facebook.auth_backends.FacebookBackend',
+)
+
 INTERNAL_IPS = ('127.0.0.1',)
 # Add the following line to your local_settings.py files to disable django-debug-toolar:
 INTERNAL_IPS = ()
@@ -196,6 +203,9 @@ SERIALIZATION_MODULES = {
     'oknesset' : 'auxiliary.serializers'
 }
 
+FACEBOOK_API_KEY = "f0b99f4293afe8d7e6823f7b0ee197d1"
+FACEBOOK_APP_ID = "140153199345253"
+FACEBOOK_APP_SECRET = "0896251f48037f59fcbf54d49878dfb9"
 # if you add a local_settings.py file, it will override settings here
 # but please, don't commit it to git.
 try: 

@@ -18,6 +18,7 @@ install_requires = [
     'BeautifulSoup',
     'nose',
     'django-nose',
+    'django-facebook',
     ]
 setup(
         name = "Open-Knesset",

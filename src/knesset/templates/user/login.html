@@ -20,8 +20,26 @@
     <a href="{% url register %}?next={{next}}">{% trans "New user? Register" %}</a><br>
     <a href="{% url password_reset %}?next={{next}}">{% trans "Forgot password?" %}</a><br>    
 
+    <form action="{% url facebook_connect %}?facebook_login=1" method="post">
+    <a href="javascript:void(0);" style="font-size: 20px;" onclick="F.connect(this.parentNode);">Register, login or connect with facebook</a>
+    <input type="hidden" value="{{ next }}" name="next" />
+    </form>
+
     
 </div>
 {% endif %}
+
+<div id="fb-root"></div>
+<script src="{{ MEDIA_URL }}js/facebook.js" type="text/javascript"></script>
+<script>
+facebookAppId = '{{ FACEBOOK_APP_ID }}';
+function facebookJSLoaded(){
+FB.init({appId: facebookAppId, status: false, cookie: true, xfbml: true, oauth: true});
+}
+window.fbAsyncInit = facebookJSLoaded;
+F = new facebookClass(facebookAppId);
+F.load();
+</script>
+
 {% endblock %}
 

@@ -64,6 +64,8 @@ urlpatterns = patterns('',
      url(r'^tags/(?P<object_type>\w+)/(?P<object_id>\d+)/add-tag/$', add_tag_to_object, name='add-tag-to-object'),
      url(r'^tags/(?P<object_type>\w+)/(?P<object_id>\d+)/remove-tag/$', remove_tag_from_object),
      url(r'^tags/(?P<object_type>\w+)/(?P<object_id>\d+)/create-tag/$', create_tag_and_add_to_item, name='create-tag'),
+     (r'^facebook/', include('django_facebook.urls')),
+
 )
 urlpatterns += mksurlpatterns + lawsurlpatterns + committeesurlpatterns
 if settings.LOCAL_DEV:
