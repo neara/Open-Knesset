@@ -209,6 +209,11 @@ I have a deadline''')
         # cleanup
         self.ti.delete()
 
+    def testAdmins(self):
+        self.assertFalse(self.committee_1.is_admin(self.jacob))
+        self.committee_1.admins.add(self.jacob)
+        self.assertTrue(self.committee_1.is_admin(self.jacob))
+
     def tearDown(self):
         self.meeting_1.delete()
         self.meeting_2.delete()
