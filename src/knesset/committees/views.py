@@ -170,14 +170,19 @@ class TopicListView(generic.ListView):
 class TopicDetailView(DetailView):
     model = Topic
     context_object_name = 'topic'
+
     def get_context_data(self, **kwargs):
         context = super(TopicDetailView, self).get_context_data(**kwargs)
         topic = context['object']
         if self.request.user.is_authenticated():
             p = self.request.user.get_profile()
             watched = topic in p.topics
+            context['is_editor'] = topic.is_editor(self.request.user)
+            context['is_admin'] = topic.is_admin(self.request.user)
         else:
             watched = False
+            context['is_editor'] = False
+            context['is_admin'] = False
         context['watched_object'] = watched
         return context
 

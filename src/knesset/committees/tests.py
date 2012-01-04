@@ -264,10 +264,10 @@ I have a deadline''')
         self.assertEqual(self.committee_1.topic_set.get_public().count(), 0)
 
     def testPermissions(self):
-        self.assertTrue(self.topic.can_edit(self.jacob))
-        self.assertFalse(self.topic.can_edit(self.ofri))
+        self.assertTrue(self.topic.is_editor(self.jacob))
+        self.assertFalse(self.topic.is_editor(self.ofri))
         self.topic.editors.add(self.ofri)
-        self.assertTrue(self.topic.can_edit(self.ofri))
+        self.assertTrue(self.topic.is_editor(self.ofri))
         self.topic.editors.remove(self.ofri)
 
 
@@ -357,6 +357,23 @@ I have a deadline''')
         self.topic2.rating.add(score=4, user=self.ofri, ip_address="127.0.0.1")
         self.assertQuerysetEqual(Topic.objects.by_rank(),
                                  ["<Topic: bye>", "<Topic: hello>"])
+
+    def testAdmins(self):
+        self.assertFalse(self.topic.is_admin(self.jacob))
+        self.committee_1.admins.add(self.jacob)
+        self.assertTrue(self.topic.is_admin(self.jacob))
+        res = self.client.get(self.topic.get_absolute_url())
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(res.context['is_editor'])
+        self.assertFalse(res.context['is_admin'])
+        # login as the admin
+        self.assertTrue(self.client.login(username='jacob',
+                                          password='JKM'))
+        res = self.client.get(self.topic.get_absolute_url())
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.context['is_editor'])
+        self.assertTrue(res.context['is_admin'])
+
 
     def tearDown(self):
         self.meeting_1.delete()

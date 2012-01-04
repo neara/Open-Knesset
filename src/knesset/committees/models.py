@@ -283,8 +283,13 @@ class Topic(models.Model):
                            )
        self.save()
 
-    def can_edit(self, user):
+    def is_editor(self, user):
         return user==self.creator or user in self.editors.all()
 
+    def is_admin(self, user):
+        admins = models.query.EmptyQuerySet()
+        for c in self.committees.all():
+            admins |= c.admins.all()
+        return user in admins
 
 from listeners import *
