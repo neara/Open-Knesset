@@ -15,7 +15,8 @@ from knesset.persons.models import Person,PersonAlias
 from knesset.laws.models import (Vote, VoteAction, Bill, Law, PrivateProposal,
      KnessetProposal, GovProposal, GovLegislationCommitteeDecision)
 from knesset.links.models import Link
-from knesset.committees.models import Committee,CommitteeMeeting
+from knesset.committees.models import (Committee,CommitteeMeeting,
+     get_committee_protocol_text)
 from knesset.utils import cannonize
 
 import mk_info_html_parser as mk_parser
@@ -34,6 +35,7 @@ logger = logging.getLogger("open-knesset.syncdata")
 p_explanation = '</p><p class="explanation-header">דברי הסבר</p><p>'.decode('utf8')
 strong_explanation = re.compile('<strong>\s*ד\s*ב\s*ר\s*י\s*ה\s*ס\s*ב\s*ר\s*</strong>'.decode('utf8'),re.UNICODE)
 explanation = re.compile('ד\s*ב\s*ר\s*י\s*ה\s*ס\s*ב\s*ר'.decode('utf8'), re.UNICODE)
+
 
 class Command(NoArgsCommand):
     option_list = NoArgsCommand.option_list + (
@@ -829,7 +831,7 @@ class Command(NoArgsCommand):
                 logger.debug('cm %d created' % cm.id)
             updated_protocol = False
             if not cm.protocol_text:
-                cm.protocol_text = self.get_committee_protocol_text(link)
+                cm.protocol_text = get_committee_protocol_text(link)
                 updated_protocol = True
             cm.save()
 
@@ -849,37 +851,6 @@ class Command(NoArgsCommand):
                 exceptionType, exceptionValue, exceptionTraceback = sys.exc_info()
                 logger.debug("%s%s", ''.join(traceback.format_exception(exceptionType, exceptionValue, exceptionTraceback)), '\nCommitteeMeeting.id='+str(cm.id))
             logger.debug('added %d members' % cm.mks_attended.count())
-
-    def get_committee_protocol_text(self, url):
-        if url.find('html'):
-            url = url.replace('html','rtf')
-        file_str = StringIO()
-        count = 0
-        flag = True
-        while count<10 and flag:
-            try:
-                file_str.write(urllib2.urlopen(url).read())
-                flag = False
-            except Exception:
-                count += 1
-        if flag:
-            logger.error("can't open url %s. tried %d times" % (url, count))
-        try:
-            doc = Rtf15Reader.read(file_str)
-        except Exception:
-            return ''
-        text = []
-        attended_list = False
-        for paragraph in doc.content:
-            for sentence in paragraph.content:
-                if 'bold' in sentence.properties and attended_list:
-                    attended_list = False
-                    text.append('')
-                if 'מוזמנים'.decode('utf8') in sentence.content[0] and 'bold' in sentence.properties:
-                    attended_list = True
-                text.append(sentence.content[0])
-        all_text = '\n'.join(text)
-        return re.sub(r'\n:\n',r':\n',all_text)
 
     def get_full_text(self,v):
         try:

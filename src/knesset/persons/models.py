@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.forms.fields import IntegerField
+from django.contrib.auth.models import User
 
 class Title(models.Model):
     name = models.CharField(max_length=64)
@@ -20,6 +21,7 @@ class Person(models.Model):
     name = models.CharField(max_length=64)
     mk = models.ForeignKey('mks.Member', blank=True, null=True, related_name='person')
     titles = models.ManyToManyField(Title, blank=True, null=True, related_name='persons')
+    user = models.ForeignKey(User, blank=True, null=True, related_name='person')
     
     def __unicode__(self):
         return self.name

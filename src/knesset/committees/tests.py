@@ -1,3 +1,5 @@
+import os
+from StringIO import StringIO
 from datetime import datetime
 from django.test import TestCase
 from django.conf import settings
@@ -14,6 +16,16 @@ from models import *
 
 just_id = lambda x: x.id
 APP = 'committees'
+
+class CommitteeModelsTest(TestCase):
+    def testProtocolParsing(self):
+        joke = '''a: knock knock
+b: who's there?
+a: huch
+b: huch who?'''
+        text = get_committee_protocol_text(open(os.path.join('tests','sample.rtf')))
+        self.assertEqual(text, joke)
+    
 
 class CommitteeMeetingDetailViewTest(TestCase):
 

@@ -2,14 +2,16 @@
 import re
 import logging
 from datetime import datetime
+from pyth.plugins.rtf15.reader import Rtf15Reader
+
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.utils.text import truncate_words
 from django.contrib.contenttypes import generic
 from django.contrib.auth.models import User
-
 from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
+
 from tagging.models import Tag
 from djangoratings.fields import RatingField
 from annotatetext.models import Annotation
@@ -29,7 +31,7 @@ class Committee(models.Model):
        object_id_field="which_pk")
     description = models.TextField(null=True,blank=True)
     portal_knesset_broadcasts_url = models.URLField(max_length=1000, verify_exists=False)
-    admins = models.ManyToManyField(User, related_name='managing_committees')
+    admins = models.ManyToManyField(User, related_name='administers')
 
     def __unicode__(self):
         return "%s" % self.name
@@ -291,5 +293,42 @@ class Topic(models.Model):
         for c in self.committees.all():
             admins |= c.admins.all()
         return user in admins
+
+def get_committee_protocol_text(src):
+    ''' return the texts from a given url or file '''
+    if hasattr(src, 'read'):
+        io = src
+    else:
+        if src.find('html'):
+            src = src.replace('html','rtf')
+        io = StringIO()
+        # retry loop, just in case
+        count = 0
+        while count<10:
+            try:
+                io.write(urllib2.urlopen(src).read())
+                break
+            except Exception:
+                count += 1
+        if count==10:
+            logger.error("can't open url %s. tried %d times" % (url, count))
+    
+    try:
+        doc = Rtf15Reader.read(io)
+    except Exception:
+        return ''
+    text = []
+    attended_list = False
+    for paragraph in doc.content:
+        for sentence in paragraph.content:
+            if 'bold' in sentence.properties and attended_list:
+                attended_list = False
+                text.append('')
+            if 'מוזמנים'.decode('utf8') in sentence.content[0] and 'bold' in sentence.properties:
+                attended_list = True
+            text.append(sentence.content[0])
+    all_text = '\n'.join(text)
+    return re.sub(r'\n:\n',r':\n',all_text)
+
 
 from listeners import *

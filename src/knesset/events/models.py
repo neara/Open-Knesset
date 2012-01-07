@@ -25,12 +25,13 @@ class Event(models.Model):
     # TODO - just randomly looking it seems to be wrong in some objects:
     # key 1957, contains repetition of the subject.
     what = models.TextField()
-    where = models.TextField()
+    where = models.TextField(default=_("The Knesset"))
     which_type   = models.ForeignKey(ContentType,
             verbose_name=_('content type'),
             related_name="event_for_%(class)s", null=True)
     which_pk = models.TextField(_('object ID'), null=True)
     which_object = generic.GenericForeignKey(ct_field="which_type", fk_field="which_pk")
+    protocol = models.FileField(upload_to="protocols/%Y/%m", null=True, blank=True)
 
     @property
     def is_future(self):

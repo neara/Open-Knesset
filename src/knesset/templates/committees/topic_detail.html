@@ -30,7 +30,8 @@
     <ul class="actions">
         {% if not user.is_authenticated %}
             <li><a href='{% url login %}?next={{request.get_full_path}}'>{% trans 'Login to rank this topic' %}</a></li>
-        {% else %}{% if user == topic.creator %}
+        {% else %}
+        {% if is_editor %}
             <li>
                 <a href="{% url edit-committee-topic topic.committees.all.0.id topic.id %}">{% trans "Edit" %}</a>
             </li>

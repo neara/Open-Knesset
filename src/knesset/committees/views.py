@@ -24,7 +24,7 @@ from knesset.utils import clean_string
 from knesset.links.models import Link
 from models import Committee, CommitteeMeeting, Topic, COMMITTEE_PROTOCOL_PAGINATE_BY
 import models
-from forms import EditTopicForm, LinksFormset
+from forms import EditTopicForm, LinksFormset, EventsFormset
 
 logger = logging.getLogger("open-knesset.committees.views")
 
@@ -177,15 +177,27 @@ class TopicDetailView(DetailView):
         if self.request.user.is_authenticated():
             p = self.request.user.get_profile()
             watched = topic in p.topics
-            context['is_editor'] = topic.is_editor(self.request.user)
-            context['is_admin'] = topic.is_admin(self.request.user)
+            context['is_editor'] = topic.is_editor(self.request.user) or \
+                                   topic.is_admin(self.request.user)
         else:
             watched = False
             context['is_editor'] = False
-            context['is_admin'] = False
         context['watched_object'] = watched
         return context
 
+def update_events(request, fs):
+    ''' update events based on a given request & formset '''
+    events = fs.save(commit=False)
+    for event in events:
+        creator, new_creator = Person.objects.get_or_create(user=request.user)
+        event.who = creator
+        committee = request_user.adminsters.all()[0]
+        event.which_object = committee
+        #TODO: we might have to save before reading the file
+        # event.save()
+        event.what = get_committee_protocol_text(io=event.protocol.open('r'))
+        event.save()
+    
 @login_required
 def edit_topic(request, committee_id, topic_id=None):
     if request.method == 'POST':
@@ -197,7 +209,11 @@ def edit_topic(request, committee_id, topic_id=None):
             t = None
         edit_form = EditTopicForm(data=request.POST, instance=t)
         links_formset = LinksFormset(request.POST)
-        if edit_form.is_valid() and links_formset.is_valid():
+        events_formset = EventsFormset(request.POST) 
+        forms = [edit_form, links_formset, events_formset]
+        # checks that all forms are valid
+        if reduce (lambda x,y: x and y, map(lambda x: x.is_valid, forms)):
+            # save basic topic info
             topic = edit_form.save(commit=False)
             if topic_id:
                 topic.id = topic_id
@@ -205,12 +221,18 @@ def edit_topic(request, committee_id, topic_id=None):
                 topic.creator = request.user
             topic.save()
             edit_form.save_m2m()
+
+            # update links
             links = links_formset.save(commit=False)
             ct = ContentType.objects.get_for_model(topic)
             for link in links:
                 link.content_type = ct
                 link.object_pk = topic.id
                 link.save()
+
+            # update events
+            if topic.is_admin(request.user):
+                update_events(request, events_formset)
 
             m = request.user.message_set.create()
             m.message = 'Topic has been updated.'
@@ -236,6 +258,33 @@ def edit_topic(request, committee_id, topic_id=None):
             {'edit_form': edit_form,
              'links_formset': links_formset,
             }))
+
+@login_required
+def admin_topic(request, topic_id):
+    if request.method == 'POST':
+        if topic_id:
+            t = Topic.objects.get(pk=topic_id)
+            if not t.is_admin(request.user):
+                return HttpResponseForbidden()
+        else:
+            return HttpResponseForbidden()
+        form = EditTopicForm(data=request.POST, instance=t)
+        # handle events formset
+        if form.is_valid():
+            topic = form.save()
+            m = request.user.message_set.create()
+            m.message = 'Topic has been updated.'
+            m.save()
+            return HttpResponseRedirect(topic.get_absolute_url())
+
+    if request.method == 'GET':
+        t = Topic.objects.get(pk=topic_id)
+        if not t.is_admin(request.user):
+            return HttpResponseForbidden()
+        form = EditTopicForm(instance=t)
+
+    return render_to_response('committees/admin_topic.html',
+        context_instance=RequestContext(request, {'form': form, }))
 
 @login_required
 def delete_topic(request, pk):
