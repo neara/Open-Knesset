@@ -377,14 +377,12 @@ I have a deadline''')
         res = self.client.get(self.topic.get_absolute_url())
         self.assertEqual(res.status_code, 200)
         self.assertFalse(res.context['is_editor'])
-        self.assertFalse(res.context['is_admin'])
         # login as the admin
         self.assertTrue(self.client.login(username='jacob',
                                           password='JKM'))
         res = self.client.get(self.topic.get_absolute_url())
         self.assertEqual(res.status_code, 200)
         self.assertTrue(res.context['is_editor'])
-        self.assertTrue(res.context['is_admin'])
 
 
     def tearDown(self):
