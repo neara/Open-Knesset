@@ -31,7 +31,6 @@ class Committee(models.Model):
        object_id_field="which_pk")
     description = models.TextField(null=True,blank=True)
     portal_knesset_broadcasts_url = models.URLField(max_length=1000, verify_exists=False)
-    admins = models.ManyToManyField(User, related_name='administers')
 
     def __unicode__(self):
         return "%s" % self.name
@@ -69,10 +68,6 @@ class Committee(models.Model):
 
     def recent_meetings(self):
         return self.meetings.all().order_by('-date')[:10]
-
-    def is_admin(self, user):
-        ''' test if a user is an amin for the committee '''
-        return user in self.admins.all()
 
 not_header = re.compile(r'(^אני )|((אלה|אלו|יבוא|מאלה|ייאמר|אומר|אומרת|נאמר|כך|הבאים|הבאות):$)|(\(.\))|(\(\d+\))|(\d\.)'.decode('utf8'))
 def legitimate_header(line):
@@ -288,12 +283,6 @@ class Topic(models.Model):
     def is_editor(self, user):
         return user==self.creator or user in self.editors.all()
 
-    def is_admin(self, user):
-        admins = models.query.EmptyQuerySet()
-        for c in self.committees.all():
-            admins |= c.admins.all()
-        return user in admins
-
 def get_committee_protocol_text(src):
     ''' return the texts from a given url or file '''
     if hasattr(src, 'read'):
@@ -330,5 +319,22 @@ def get_committee_protocol_text(src):
     all_text = '\n'.join(text)
     return re.sub(r'\n:\n',r':\n',all_text)
 
+class Board(models.Model):
+    admins = models.ManyToManyField(User, related_name='administers', verbose_name=_('Admins'))
+    committee = models.ForeignKey(Committee, verbose_name = _('Committees'), related_name='boards')
+    topics = models.ManyToManyField(Committee, verbose_name = _('Committees'))
+    events = generic.GenericRelation(Event, content_type_field="which_type",
+       object_id_field="which_pk")
+
+
+    def __unicode__(self):
+        return "Board for %s" % ' '.join(self.committees.all().values_list('name', flat=True))
+
+    @models.permalink
+    def get_absolute_url(self):
+        return ('board-detail', [str(self.id)])
+
+    def is_admin(self, user):
+        return user in self.admins.all()
 
 from listeners import *
