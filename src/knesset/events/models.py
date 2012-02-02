@@ -17,7 +17,7 @@ class Event(models.Model):
         and discuss upcoming events.
     '''
     when = models.DateTimeField()
-    when_over = models.DateTimeField(null=True)
+    when_over = models.DateTimeField(null=True, blank=True)
     # KNESSET_TODO the end time of a committee meeting is not recorded anywhere,
     # so we are left to guess
     when_over_guessed = models.BooleanField(default=True)
@@ -46,6 +46,7 @@ class Event(models.Model):
         return self.which_object and unicode(self.which_object) or self.what
 
     def get_absolute_url(self):
+        ''' event url are anchors in the `which` page '''
         if self.which_object:
             return '%s#event-%d' % (self.which_object.get_absolute_url(), self.id)
         else:
