@@ -114,6 +114,7 @@ INSTALLED_APPS = (
     'djangoratings',
     'voting',
     'compressor',
+    'comite',                             # knesset apps to be pluggable
     'knesset',
     'knesset.auxiliary',                  # knesset apps
     'knesset.mks',

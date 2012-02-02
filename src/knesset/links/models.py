@@ -54,3 +54,9 @@ class LinkedFile(models.Model):
     sha1 = models.CharField(max_length=1000, null=True)
     last_updated = models.DateTimeField(auto_now=True, null=True)
     link_file = models.FileField(storage=link_file_storage, upload_to='link_files')
+
+class LinksField(models.ManyToManyField):
+    ''' use me to add a links field to your model '''
+    def __init__(self, *args,**kwargs):
+        return super(models.ManyToManyField, self).__init__(Link, *args, **kwargs)
+    
