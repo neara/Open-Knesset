@@ -75,6 +75,7 @@ urlpatterns = patterns('',
             template_name='laws/bill_confirm_vote.html',
             allow_xmlhttprequest=True),
         name='vote-on-bill'),
+     (r'^comite/', include('comite.urls')),
 )
 urlpatterns += mksurlpatterns + lawsurlpatterns + committeesurlpatterns
 if settings.LOCAL_DEV:

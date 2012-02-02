@@ -7,6 +7,7 @@ Replace this with more appropriate tests for your application.
 
 import datetime
 from django.test import TestCase
+from django.core.urlresolvers import reverse
 from django.contrib.auth.models import User
 from models import *
 
@@ -25,6 +26,11 @@ class SimpleTest(TestCase):
         self.assertTrue(self.comite.concepts.create(title='Hello World', creator=self.u1))
         self.assertTrue(self.comite.links.create(url='http://example.com'))
         self.assertTrue(self.comite.events.create(when=now, what='sunrise'))
+
+    def test_comite_list_view(self):
+        res = self.client.get(reverse('comite-list'))
+        self.assertEqual(res.status_code, 200)
+        self.assertTemplateUsed(res, 'comite/comite_list.html')
 
     def tearDown(self):
         self.comite.delete()

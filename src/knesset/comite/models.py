@@ -35,7 +35,7 @@ class Comite(models.Model):
 
     @models.permalink
     def get_index_url(cls):
-        return ('comite-index')
+        return ('comite-list')
 
     def __unicode__(self):
         return "%s" % self.name
