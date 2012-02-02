@@ -1,0 +1,15 @@
+{% extends "site_base.html" %}
+{% load i18n %}
+{% block extratitle %}{% trans "Comites" %}{% endblock %}
+{% block header %}
+{% endblock %}
+{% block divcontent %}
+<h1>{% trans "Comites" %}</h1>
+    <div class="item-list">
+    {% for c in comites %}
+        <div class="item {% cycle "alt" "normal" %}">
+            <a href="{{ c.get_absolute_url }}">{{c}}</a>
+        </div>
+    {% endfor %}
+    </div>
+{% endblock %}

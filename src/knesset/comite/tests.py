@@ -32,5 +32,10 @@ class SimpleTest(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertTemplateUsed(res, 'comite/comite_list.html')
 
+    def test_comite_detail_view(self):
+        res = self.client.get(self.comite.get_absolute_url())
+        self.assertEqual(res.status_code, 200)
+        self.assertTemplateUsed(res, 'comite/comite_detail.html')
+
     def tearDown(self):
         self.comite.delete()
