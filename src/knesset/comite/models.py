@@ -19,7 +19,8 @@ class Comite(models.Model):
 
     # topics = models.ManyToManyField('Topic', related_name='comites', verbose_name=_('Topics'))
     links = models.ManyToManyField(Link);
-    events = EventsField();
+    events = generic.GenericRelation(Event, content_type_field="which_type",
+       object_id_field="which_pk")
 
     members = models.ManyToManyField(User, related_name='comites', verbose_name=_('Members'))
     chairs = models.ManyToManyField(User, related_name='comites_chairs', verbose_name=_('Chairmans'))
@@ -38,8 +39,3 @@ class Comite(models.Model):
 
     def __unicode__(self):
         return "%s" % self.title
-
-
-    
-    events = generic.GenericRelation(Event, content_type_field="which_type",
-       object_id_field="which_pk")
