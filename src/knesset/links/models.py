@@ -54,8 +54,3 @@ class LinkedFile(models.Model):
     sha1 = models.CharField(max_length=1000, null=True)
     last_updated = models.DateTimeField(auto_now=True, null=True)
     link_file = models.FileField(storage=link_file_storage, upload_to='link_files')
-
-def LinksField(**kwargs):
-    ''' use me to add a links field to your model '''
-    return generic.GenericRelation(Link, content_type_field="content_type",
-       object_id_field="object_pk")

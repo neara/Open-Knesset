@@ -8,6 +8,30 @@ class Migration(SchemaMigration):
 
     def forwards(self, orm):
         
+        # Adding model 'Issue'
+        db.create_table('comite_issue', (
+            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('creator', self.gf('django.db.models.fields.related.ForeignKey')(related_name='concpets', to=orm['auth.User'])),
+            ('title', self.gf('django.db.models.fields.CharField')(max_length=256)),
+            ('description', self.gf('django.db.models.fields.TextField')(blank=True)),
+            ('status', self.gf('django.db.models.fields.IntegerField')(default=0)),
+            ('tags', self.gf('tagging.fields.TagField')()),
+            ('created', self.gf('django.db.models.fields.DateTimeField')(auto_now_add=True, blank=True)),
+            ('modified', self.gf('django.db.models.fields.DateTimeField')(auto_now=True, blank=True)),
+            ('log', self.gf('django.db.models.fields.TextField')(default='', blank=True)),
+            ('rating_votes', self.gf('django.db.models.fields.PositiveIntegerField')(default=0, blank=True)),
+            ('rating_score', self.gf('django.db.models.fields.IntegerField')(default=0, blank=True)),
+        ))
+        db.send_create_signal('comite', ['Issue'])
+
+        # Adding M2M table for field editors on 'Issue'
+        db.create_table('comite_issue_editors', (
+            ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
+            ('issue', models.ForeignKey(orm['comite.issue'], null=False)),
+            ('user', models.ForeignKey(orm['auth.user'], null=False))
+        ))
+        db.create_unique('comite_issue_editors', ['issue_id', 'user_id'])
+
         # Adding model 'Comite'
         db.create_table('comite_comite', (
             ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
@@ -16,13 +40,13 @@ class Migration(SchemaMigration):
         ))
         db.send_create_signal('comite', ['Comite'])
 
-        # Adding M2M table for field links on 'Comite'
-        db.create_table('comite_comite_links', (
+        # Adding M2M table for field issues on 'Comite'
+        db.create_table('comite_comite_issues', (
             ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
             ('comite', models.ForeignKey(orm['comite.comite'], null=False)),
-            ('link', models.ForeignKey(orm['links.link'], null=False))
+            ('issue', models.ForeignKey(orm['comite.issue'], null=False))
         ))
-        db.create_unique('comite_comite_links', ['comite_id', 'link_id'])
+        db.create_unique('comite_comite_issues', ['comite_id', 'issue_id'])
 
         # Adding M2M table for field members on 'Comite'
         db.create_table('comite_comite_members', (
@@ -43,11 +67,17 @@ class Migration(SchemaMigration):
 
     def backwards(self, orm):
         
+        # Deleting model 'Issue'
+        db.delete_table('comite_issue')
+
+        # Removing M2M table for field editors on 'Issue'
+        db.delete_table('comite_issue_editors')
+
         # Deleting model 'Comite'
         db.delete_table('comite_comite')
 
-        # Removing M2M table for field links on 'Comite'
-        db.delete_table('comite_comite_links')
+        # Removing M2M table for field issues on 'Comite'
+        db.delete_table('comite_comite_issues')
 
         # Removing M2M table for field members on 'Comite'
         db.delete_table('comite_comite_members')
@@ -91,9 +121,24 @@ class Migration(SchemaMigration):
             'chairs': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'comites_chairs'", 'symmetrical': 'False', 'to': "orm['auth.User']"}),
             'description': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'links': ('django.db.models.fields.related.ManyToManyField', [], {'to': "orm['links.Link']", 'symmetrical': 'False'}),
+            'issues': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'comites'", 'symmetrical': 'False', 'to': "orm['comite.Issue']"}),
             'members': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'comites'", 'symmetrical': 'False', 'to': "orm['auth.User']"}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '256'})
+        },
+        'comite.issue': {
+            'Meta': {'object_name': 'Issue'},
+            'created': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
+            'creator': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'concpets'", 'to': "orm['auth.User']"}),
+            'description': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
+            'editors': ('django.db.models.fields.related.ManyToManyField', [], {'blank': 'True', 'related_name': "'editing_issues'", 'null': 'True', 'symmetrical': 'False', 'to': "orm['auth.User']"}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'log': ('django.db.models.fields.TextField', [], {'default': "''", 'blank': 'True'}),
+            'modified': ('django.db.models.fields.DateTimeField', [], {'auto_now': 'True', 'blank': 'True'}),
+            'rating_score': ('django.db.models.fields.IntegerField', [], {'default': '0', 'blank': 'True'}),
+            'rating_votes': ('django.db.models.fields.PositiveIntegerField', [], {'default': '0', 'blank': 'True'}),
+            'status': ('django.db.models.fields.IntegerField', [], {'default': '0'}),
+            'tags': ('tagging.fields.TagField', [], {}),
+            'title': ('django.db.models.fields.CharField', [], {'max_length': '256'})
         },
         'contenttypes.contenttype': {
             'Meta': {'ordering': "('name',)", 'unique_together': "(('app_label', 'model'),)", 'object_name': 'ContentType', 'db_table': "'django_content_type'"},
@@ -107,7 +152,7 @@ class Migration(SchemaMigration):
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'what': ('django.db.models.fields.TextField', [], {}),
             'when': ('django.db.models.fields.DateTimeField', [], {}),
-            'when_over': ('django.db.models.fields.DateTimeField', [], {'null': 'True'}),
+            'when_over': ('django.db.models.fields.DateTimeField', [], {'null': 'True', 'blank': 'True'}),
             'when_over_guessed': ('django.db.models.fields.BooleanField', [], {'default': 'True'}),
             'where': ('django.db.models.fields.TextField', [], {}),
             'which_pk': ('django.db.models.fields.TextField', [], {'null': 'True'}),
