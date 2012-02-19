@@ -8,15 +8,15 @@ from tagging.fields import TagField
 from links.fields import LinksField
 from events.fields import EventsField
 
-ISSUE_PUBLISHED, ISSUE_FLAGGED, ISSUE_REJECTED,\
-ISSUE_ACCEPTED, ISSUE_APPEAL, ISSUE_DELETED = range(6)
-PUBLIC_ISSUE_STATUS = ( ISSUE_PUBLISHED, ISSUE_ACCEPTED)
+ISSUE_PROPOSED, ISSUE_PUBLISHED, ISSUE_FLAGGED, ISSUE_REJECTED,\
+ISSUE_ACCEPTED, ISSUE_APPEAL, ISSUE_DELETED = range(7)
+PUBLIC_ISSUE_STATUS = ( ISSUE_PUBLISHED, ISSUE_ACCEPTED, ISSUE_APPEAL)
 
+# define the roles of users when it comes to the comite and it's issues
+LEADER, EDITOR, AUTHOR, FOLLOWER = range(4)
 class Issue(models.Model):
     ''' Issue is used to hold a issue to explore and invistigate '''
-
-    creator = models.ForeignKey(User, related_name='concpets')
-    editors = models.ManyToManyField(User, null=True, blank=True, related_name = 'editing_issues')
+    users = models.ManyToManyField(User, null=True, blank=True, related_name = 'issues', through = 'UsersNIssues')
     title = models.CharField(max_length=256,
                              verbose_name = _('Title'))
     description = models.TextField(blank=True,
@@ -49,6 +49,16 @@ class Issue(models.Model):
     def __unicode__(self):
         return "%s" % self.title
 
+class UsersNIssues (models.Model):
+    user = models.ForeignKey(User, verbose_name=_('User'))
+    issue = models.ForeignKey(Issue, verbose_name=_('Issue'))
+    role = models.IntegerField(choices = (
+        (LEADER, _('leader')),
+        (EDITOR, _('editor')),
+        (AUTHOR, _('author')),
+        (FOLLOWER, _('follower')),
+            ), default=FOLLOWER)
+
 class Comite(models.Model):
     ''' Comite - a simpler committee
     '''
@@ -59,8 +69,7 @@ class Comite(models.Model):
     links = LinksField()
     events = EventsField()
 
-    members = models.ManyToManyField(User, related_name='comites', verbose_name=_('Members'))
-    chairs = models.ManyToManyField(User, related_name='comites_chairs', verbose_name=_('Chairmans'))
+    users = models.ManyToManyField(User, related_name='comites', verbose_name=_('Users'), through='UsersNComites')
 
     class Meta:
         verbose_name = _('Committee')
@@ -72,4 +81,14 @@ class Comite(models.Model):
 
     def __unicode__(self):
         return "%s" % self.name
+
+class UsersNComites (models.Model):
+    user = models.ForeignKey(User, verbose_name=_('User'))
+    comite = models.ForeignKey(Comite, verbose_name=('Comite'))
+    role = models.IntegerField(choices = (
+        (LEADER, _('leader')),
+        (EDITOR, _('editor')),
+        (AUTHOR, _('author')),
+        (FOLLOWER, _('follower')),
+            ), default=FOLLOWER)
 

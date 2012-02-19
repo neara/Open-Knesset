@@ -23,7 +23,7 @@ class SimpleTest(TestCase):
         """
         Tests the creation of all the models
         """
-        self.assertTrue(self.comite.issues.create(title='Hello World', creator=self.u1))
+        self.assertTrue(self.comite.issues.create(title='Hello World'))
         self.assertTrue(self.comite.links.create(url='http://example.com'))
         self.assertTrue(self.comite.events.create(when=now, what='sunrise'))
 

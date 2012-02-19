@@ -11,10 +11,9 @@ class Migration(SchemaMigration):
         # Adding model 'Issue'
         db.create_table('comite_issue', (
             ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('creator', self.gf('django.db.models.fields.related.ForeignKey')(related_name='concpets', to=orm['auth.User'])),
             ('title', self.gf('django.db.models.fields.CharField')(max_length=256)),
             ('description', self.gf('django.db.models.fields.TextField')(blank=True)),
-            ('status', self.gf('django.db.models.fields.IntegerField')(default=0)),
+            ('status', self.gf('django.db.models.fields.IntegerField')(default=1)),
             ('tags', self.gf('tagging.fields.TagField')()),
             ('created', self.gf('django.db.models.fields.DateTimeField')(auto_now_add=True, blank=True)),
             ('modified', self.gf('django.db.models.fields.DateTimeField')(auto_now=True, blank=True)),
@@ -24,13 +23,14 @@ class Migration(SchemaMigration):
         ))
         db.send_create_signal('comite', ['Issue'])
 
-        # Adding M2M table for field editors on 'Issue'
-        db.create_table('comite_issue_editors', (
-            ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
-            ('issue', models.ForeignKey(orm['comite.issue'], null=False)),
-            ('user', models.ForeignKey(orm['auth.user'], null=False))
+        # Adding model 'UsersNIssues'
+        db.create_table('comite_usersnissues', (
+            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('user', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['auth.User'])),
+            ('issue', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['comite.Issue'])),
+            ('role', self.gf('django.db.models.fields.IntegerField')(default=3)),
         ))
-        db.create_unique('comite_issue_editors', ['issue_id', 'user_id'])
+        db.send_create_signal('comite', ['UsersNIssues'])
 
         # Adding model 'Comite'
         db.create_table('comite_comite', (
@@ -48,21 +48,14 @@ class Migration(SchemaMigration):
         ))
         db.create_unique('comite_comite_issues', ['comite_id', 'issue_id'])
 
-        # Adding M2M table for field members on 'Comite'
-        db.create_table('comite_comite_members', (
-            ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
-            ('comite', models.ForeignKey(orm['comite.comite'], null=False)),
-            ('user', models.ForeignKey(orm['auth.user'], null=False))
+        # Adding model 'UsersNComites'
+        db.create_table('comite_usersncomites', (
+            ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('user', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['auth.User'])),
+            ('comite', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['comite.Comite'])),
+            ('role', self.gf('django.db.models.fields.IntegerField')(default=3)),
         ))
-        db.create_unique('comite_comite_members', ['comite_id', 'user_id'])
-
-        # Adding M2M table for field chairs on 'Comite'
-        db.create_table('comite_comite_chairs', (
-            ('id', models.AutoField(verbose_name='ID', primary_key=True, auto_created=True)),
-            ('comite', models.ForeignKey(orm['comite.comite'], null=False)),
-            ('user', models.ForeignKey(orm['auth.user'], null=False))
-        ))
-        db.create_unique('comite_comite_chairs', ['comite_id', 'user_id'])
+        db.send_create_signal('comite', ['UsersNComites'])
 
 
     def backwards(self, orm):
@@ -70,8 +63,8 @@ class Migration(SchemaMigration):
         # Deleting model 'Issue'
         db.delete_table('comite_issue')
 
-        # Removing M2M table for field editors on 'Issue'
-        db.delete_table('comite_issue_editors')
+        # Deleting model 'UsersNIssues'
+        db.delete_table('comite_usersnissues')
 
         # Deleting model 'Comite'
         db.delete_table('comite_comite')
@@ -79,11 +72,8 @@ class Migration(SchemaMigration):
         # Removing M2M table for field issues on 'Comite'
         db.delete_table('comite_comite_issues')
 
-        # Removing M2M table for field members on 'Comite'
-        db.delete_table('comite_comite_members')
-
-        # Removing M2M table for field chairs on 'Comite'
-        db.delete_table('comite_comite_chairs')
+        # Deleting model 'UsersNComites'
+        db.delete_table('comite_usersncomites')
 
 
     models = {
@@ -118,27 +108,39 @@ class Migration(SchemaMigration):
         },
         'comite.comite': {
             'Meta': {'object_name': 'Comite'},
-            'chairs': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'comites_chairs'", 'symmetrical': 'False', 'to': "orm['auth.User']"}),
             'description': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'issues': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'comites'", 'symmetrical': 'False', 'to': "orm['comite.Issue']"}),
-            'members': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'comites'", 'symmetrical': 'False', 'to': "orm['auth.User']"}),
-            'name': ('django.db.models.fields.CharField', [], {'max_length': '256'})
+            'name': ('django.db.models.fields.CharField', [], {'max_length': '256'}),
+            'users': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'comites'", 'symmetrical': 'False', 'through': "orm['comite.UsersNComites']", 'to': "orm['auth.User']"})
         },
         'comite.issue': {
             'Meta': {'object_name': 'Issue'},
             'created': ('django.db.models.fields.DateTimeField', [], {'auto_now_add': 'True', 'blank': 'True'}),
-            'creator': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'concpets'", 'to': "orm['auth.User']"}),
             'description': ('django.db.models.fields.TextField', [], {'blank': 'True'}),
-            'editors': ('django.db.models.fields.related.ManyToManyField', [], {'blank': 'True', 'related_name': "'editing_issues'", 'null': 'True', 'symmetrical': 'False', 'to': "orm['auth.User']"}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'log': ('django.db.models.fields.TextField', [], {'default': "''", 'blank': 'True'}),
             'modified': ('django.db.models.fields.DateTimeField', [], {'auto_now': 'True', 'blank': 'True'}),
             'rating_score': ('django.db.models.fields.IntegerField', [], {'default': '0', 'blank': 'True'}),
             'rating_votes': ('django.db.models.fields.PositiveIntegerField', [], {'default': '0', 'blank': 'True'}),
-            'status': ('django.db.models.fields.IntegerField', [], {'default': '0'}),
+            'status': ('django.db.models.fields.IntegerField', [], {'default': '1'}),
             'tags': ('tagging.fields.TagField', [], {}),
-            'title': ('django.db.models.fields.CharField', [], {'max_length': '256'})
+            'title': ('django.db.models.fields.CharField', [], {'max_length': '256'}),
+            'users': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'issues'", 'to': "orm['auth.User']", 'through': "orm['comite.UsersNIssues']", 'blank': 'True', 'symmetrical': 'False', 'null': 'True'})
+        },
+        'comite.usersncomites': {
+            'Meta': {'object_name': 'UsersNComites'},
+            'comite': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['comite.Comite']"}),
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'role': ('django.db.models.fields.IntegerField', [], {'default': '3'}),
+            'user': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['auth.User']"})
+        },
+        'comite.usersnissues': {
+            'Meta': {'object_name': 'UsersNIssues'},
+            'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'issue': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['comite.Issue']"}),
+            'role': ('django.db.models.fields.IntegerField', [], {'default': '3'}),
+            'user': ('django.db.models.fields.related.ForeignKey', [], {'to': "orm['auth.User']"})
         },
         'contenttypes.contenttype': {
             'Meta': {'ordering': "('name',)", 'unique_together': "(('app_label', 'model'),)", 'object_name': 'ContentType', 'db_table': "'django_content_type'"},
