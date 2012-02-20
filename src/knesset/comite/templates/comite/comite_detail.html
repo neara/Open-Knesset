@@ -7,8 +7,8 @@
 <h1>{% trans "Comite" %}&nbsp;{{comite.name}}</h1>
     {{comite.description}}
 
-    <div class="event-list">
-    {% for e in comite.events.all %}
+    <div class="item-list">
+    {% for e in issues %}
         <div class="item {% cycle "alt" "normal" %}">
             <a href="{{ e.get_absolute_url }}" id="event-{{e.id}}">{{e}}</a>
         </div>

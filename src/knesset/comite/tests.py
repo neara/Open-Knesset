@@ -18,12 +18,12 @@ class SimpleTest(TestCase):
     def setUp (self):
         self.comite = Comite.objects.create(name='comite')
         self.u1 = User.objects.create(username='abe')
+        self.i1 = self.comite.issues.create(title='Hello World')
 
     def test_creation(self):
         """
         Tests the creation of all the models
         """
-        self.assertTrue(self.comite.issues.create(title='Hello World'))
         self.assertTrue(self.comite.links.create(url='http://example.com'))
         self.assertTrue(self.comite.events.create(when=now, what='sunrise'))
 
@@ -36,6 +36,14 @@ class SimpleTest(TestCase):
         res = self.client.get(self.comite.get_absolute_url())
         self.assertEqual(res.status_code, 200)
         self.assertTemplateUsed(res, 'comite/comite_detail.html')
+        print res.context
+        self.assertQuerysetEqual(res.context['issues'], [repr(self.i1)])
+        # test non public issues
+        self.i1.status = ISSUE_REJECTED
+        self.i1.save()
+        res = self.client.get(self.comite.get_absolute_url())
+        self.assertEqual(res.status_code, 200)
+        self.assertFalse(res.context['issues'])
 
     def tearDown(self):
         self.comite.delete()

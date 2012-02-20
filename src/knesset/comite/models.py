@@ -8,12 +8,19 @@ from tagging.fields import TagField
 from links.fields import LinksField
 from events.fields import EventsField
 
+from settings import *
+
 ISSUE_PROPOSED, ISSUE_PUBLISHED, ISSUE_FLAGGED, ISSUE_REJECTED,\
 ISSUE_ACCEPTED, ISSUE_APPEAL, ISSUE_DELETED = range(7)
 PUBLIC_ISSUE_STATUS = ( ISSUE_PUBLISHED, ISSUE_ACCEPTED, ISSUE_APPEAL)
 
 # define the roles of users when it comes to the comite and it's issues
 LEADER, EDITOR, AUTHOR, FOLLOWER = range(4)
+
+class IssueManager(models.Manager):
+    def public(self):
+        return self.filter(status__in=PUBLIC_ISSUE_STATUS)
+
 class Issue(models.Model):
     ''' Issue is used to hold a issue to explore and invistigate '''
     users = models.ManyToManyField(User, null=True, blank=True, related_name = 'issues', through = 'UsersNIssues')
@@ -28,7 +35,7 @@ class Issue(models.Model):
         (ISSUE_ACCEPTED, _('accepted')),
         (ISSUE_APPEAL, _('appeal')),
         (ISSUE_DELETED, _('deleted')),
-            ), default=ISSUE_PUBLISHED)
+        ), default=ISSUE_PUBLISHED if COMITE_AUTO_PUBLISHING else ISSUE_PROPOSED)
     rating = RatingField(range=7, can_change_vote=True, allow_delete=True)
     links = LinksField()
     events = EventsField()
@@ -37,6 +44,8 @@ class Issue(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     modified = models.DateTimeField(auto_now=True)
     log = models.TextField(default="", blank=True)
+
+    objects = IssueManager()
 
     class Meta:
         verbose_name = _('Issue')
