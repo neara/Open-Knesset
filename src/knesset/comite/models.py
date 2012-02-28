@@ -73,8 +73,12 @@ class Comite(models.Model):
     '''
     name = models.CharField(max_length=256)
     description = models.TextField(null=True,blank=True, verbose_name=_('Description'))
+    phone1 = models.CharField(max_length=12, blank=True)
+    phone2 = models.CharField(max_length=12, blank=True)
+    fax = models.CharField(max_length=12, blank=True)
+    email = models.EmailField(blank=True)
 
-    issues = models.ManyToManyField(Issue, related_name='comites', verbose_name=_('Issue'))
+    issues = models.ManyToManyField(Issue, related_name='comites', verbose_name=_('Issue'), blank=True)
     links = LinksField()
     events = EventsField()
 

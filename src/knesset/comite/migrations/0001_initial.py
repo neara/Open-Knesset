@@ -37,6 +37,10 @@ class Migration(SchemaMigration):
             ('id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
             ('name', self.gf('django.db.models.fields.CharField')(max_length=256)),
             ('description', self.gf('django.db.models.fields.TextField')(null=True, blank=True)),
+            ('phone1', self.gf('django.db.models.fields.CharField')(max_length=12, blank=True)),
+            ('phone2', self.gf('django.db.models.fields.CharField')(max_length=12, blank=True)),
+            ('fax', self.gf('django.db.models.fields.CharField')(max_length=12, blank=True)),
+            ('email', self.gf('django.db.models.fields.EmailField')(max_length=75, blank=True)),
         ))
         db.send_create_signal('comite', ['Comite'])
 
@@ -109,9 +113,13 @@ class Migration(SchemaMigration):
         'comite.comite': {
             'Meta': {'object_name': 'Comite'},
             'description': ('django.db.models.fields.TextField', [], {'null': 'True', 'blank': 'True'}),
+            'email': ('django.db.models.fields.EmailField', [], {'max_length': '75', 'blank': 'True'}),
+            'fax': ('django.db.models.fields.CharField', [], {'max_length': '12', 'blank': 'True'}),
             'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'issues': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'comites'", 'symmetrical': 'False', 'to': "orm['comite.Issue']"}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '256'}),
+            'phone1': ('django.db.models.fields.CharField', [], {'max_length': '12', 'blank': 'True'}),
+            'phone2': ('django.db.models.fields.CharField', [], {'max_length': '12', 'blank': 'True'}),
             'users': ('django.db.models.fields.related.ManyToManyField', [], {'related_name': "'comites'", 'symmetrical': 'False', 'through': "orm['comite.UsersNComites']", 'to': "orm['auth.User']"})
         },
         'comite.issue': {

@@ -4,13 +4,28 @@
 {% block header %}
 {% endblock %}
 {% block divcontent %}
-<h1>{% trans "Comite" %}&nbsp;{{comite.name}}</h1>
-    {{comite.description}}
+    <div class="sidebar">
+        <h1>{% trans "Comite" %}&nbsp;{{comite.name}}</h1>
+        <p>{{comite.description}}</p>
+        <h2>{% trans "Members" %}</h2>
+        <ul>
+            {% for member in members %} 
+                <li>{{ member }}</li>
+            {% endfor %}
+        </ul>
+        <h2>{% trans "Contact Details" %}</h2>
+        <dl>
+            <dt>{% trans "Phone" %}</dt><dd>{{commit.phone1}}</dd>
+            <dt>{% trans "Phone" %}</dt><dd> {{commit.phone2}}</dd>
+            <dt>{% trans "Fax" %}</dt><dd> {{commit.fax}}</dd>
+            <dt>{% trans "Email" %}</dt><dd> {{commit.email}}</dd>
+        </dl>
+    <div>
 
     <div class="item-list">
-    {% for e in issues %}
+    {% for issue in issues %}
         <div class="item {% cycle "alt" "normal" %}">
-            <a href="{{ e.get_absolute_url }}" id="event-{{e.id}}">{{e}}</a>
+            <a href="{{ issue.get_absolute_url }}">{{issue}}</a>
         </div>
     {% endfor %}
     </div>
