@@ -91,6 +91,8 @@ def main(request):
         bill_votes = [x['object_id'] for x in voting.models.Vote.objects.get_popular(Bill)]
         if bill_votes:
             context['bill'] = Bill.objects.get(pk=random.choice(bill_votes))
+        else:
+            context['bill'] = Bill.objects.get(pk=5857)
         context['topics'] = Topic.objects.summary('-modified')[:20]
         context['has_search'] = True # disable the base template search
         cache.set('main_page_context', context, 300) # 5 Minutes
