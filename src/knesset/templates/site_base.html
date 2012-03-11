@@ -1,19 +1,23 @@
 {% extends "base.html" %}
 {% load i18n %}
 {% block content-main %}
-  <div class="alert" style="display:none;"> 
-    <span id="message_login">
-        {% trans "You have to be logged in to enable the watch feature." %}<br>
-        <a href="{% url login %}?next={{ request.get_full_path }}">{% trans "login" %}</a>
-        {% trans "or" %}
-        <a href="{% url register %}?next={{ request.get_full_path }}">{% trans "register" %}</a>
-    </span>
-    {% block messages %}{% endblock %}
-  </div>
-    <div class="subnav subnav-fixed">{% block subnav %} {% endblock %}</div>
-    {% block header %} {% endblock %}
-    {% block divcontent %} {% block content %}ahm.. my child should replace this block{% endblock %}{% endblock %}
-    {% block social %} {% endblock %}
+    <div class="clear"></div>
+    <div class="container-fluid">
+        <div id="cse" class="main" style="display:none;"></div>
+        <div class="alert" style="display:none;"> 
+          <span id="message_login">
+            {% trans "You have to be logged in to enable the watch feature." %}<br>
+            <a href="{% url login %}?next={{ request.get_full_path }}">{% trans "login" %}</a>
+            {% trans "or" %}
+            <a href="{% url register %}?next={{ request.get_full_path }}">{% trans "register" %}</a>
+          </span>
+          {% block messages %}{% endblock %}
+        </div>
+        <div class="subnav subnav-fixed"><ul class="nav">
+            {% block subnav %} {% endblock %}
+        </ul></div>
+        {% block header %} {% endblock %}
+        {% block divcontent %} {% block content %}ahm.. my child should replace this block{% endblock %}{% endblock %}
+        {% block social %} {% endblock %}
+    </div>
 {% endblock %}
-
-

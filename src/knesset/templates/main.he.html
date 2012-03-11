@@ -5,30 +5,34 @@
 {% block extratitle %}{% trans 'Home' %}{% endblock %}
 {% block nav-main-page %} class="selected" {% endblock %}
 {% block subnav %}
-<div style="text-align:center;">
-<p><a href="{% url help %}" style="float:left;">מה אפשר לעשות באתר? </a></p>
-       <div id="main-search">{% search_form "search_page" %}</div>
-</div>
+    <li>
+        <a href="{% url help %}">מה אפשר לעשות באתר? </a>
+    </li>
 {% endblock %}
 {% block divcontent %}
-<div>
-    <div id="main-news"  class="display_note_outer" >
+<div class="row-fluid">
+    <div style="text-align:center; padding:1em;">
+       {% search_form "search_page" %}
+    </div>
+</div>
+<div class="row-fluid">
+    <div id="main-news"  class="span8 well" >
         <h3>הצעות חוק חמות באתר - הכנסו כדי להביע את דעתכם</h3>
         {% if bill %}{% bill_inabox bill %}{% endif %}
     </div>
-    <div id="main-about" class="display_note_outer">
+    <div id="main-about" class="pull-right span4 well">
         <h3><a href="/about/">אודותינו</a></h3>
         האתר מאפשר לכל אזרח להשתתף באורח פעיל יותר בפעילות הכנסת. 
         אנו סורקים את אתר הכנסת ומקורות מידע רשמיים ובאמצעות אלגוריתמים חישוביים וצוות עורכים מסור, מסדרים ומארגנים את המידע לנוחות
         המשתמש.
             האתר עדיין בפיתוח, ואנו מתנצלים מראש על באגים ושגיאות בנתונים.
     </div>
-    <div id="main-hasadna" class="display_note_outer">
+    <div id="main-hasadna" class="pull-right span4 well">
         <a href="http://yeda.us/"><img src="/static/img/hasadna-logo.png" style="width:50px; float:left"></a>
         <p>פרויקטים נוספים של <a href="http://www.hasadna.org.il/">הסדנא</a>{% ht 'hasadna' %}</p>
             <h3><a href="http://budget.msh.gov.il/">פותחים את תקציב המדינה</a></h3>
     </div>
-    <div id="main-help" class="display_note_outer">
+    <div id="main-help" class="pull-right span4 well">
         <form method="post" action="https://www.paypal.com/cgi-bin/webscr">
             <input type="hidden" value="_s-xclick" name="cmd">
             <input type="hidden" value="K7X4FWYPBR7H4" name="hosted_button_id">
@@ -37,14 +41,13 @@
         </form>
     </div>
 </div>
-<div class="clear"></div>
 
-<div class="display_note_outer" style="clear:both; margin:2em auto; width: 90%;">
-    <div class="display_note alt" style="width:50%; height: 100%;">
+<div class="row-fluid">
+    <div class="display_note span6" >
         <h3>הצעות אחרונות לסדר</h3>
         {% include "committees/_topics_summary.html" %}
     </div>
-    <div class="display_note " style="width:50%; height: 100%;">
+    <div class="display_note span6">
         <h3>{% trans "Latest Annotations and comments" %}</h3>
     <div class="annotations item-list">
         {% for a in annotations %}
