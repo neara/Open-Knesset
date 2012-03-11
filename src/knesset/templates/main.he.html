@@ -4,16 +4,26 @@
 {% block description %}{% trans 'Open Knesset - Opening the Knesset to the public' %}. {% trans 'Non partisan, non commercial site that brings you relevant, detailed and accurate information about the knesset' %}{% endblock %}
 {% block extratitle %}{% trans 'Home' %}{% endblock %}
 {% block nav-main-page %} class="selected" {% endblock %}
-{% block subnav %}
-    <li>
-        <a href="{% url help %}">מה אפשר לעשות באתר? </a>
-    </li>
-{% endblock %}
 {% block divcontent %}
-<div class="row-fluid">
-    <div style="text-align:center; padding:1em;">
-       {% search_form "search_page" %}
+<div class="navbar">
+    <div class="span6">
+        {% search_form "search_page" %}
     </div>
+    <ul class="nav pull-right">
+        <li>
+            <a href="{% url help %}">מה אפשר לעשות באתר? </a>
+        </li>
+        <li>
+            <a target="_blank" href="https://market.android.com/details?id=org.oknesset">
+                <img src="/static/img/android_app.png" alt="אייפון" height="51" width="41px">
+            </a>
+        </li>
+        <li>
+            <a target="_blank" href="http://itunes.apple.com/us/app/id475096101">
+                <img src="/static/img/iphone_app.png" alt="אייפון" height="51" width="34px">
+            </a>
+        </li>
+    </ul>
 </div>
 <div class="row-fluid">
     <div id="main-news"  class="span8 well" >

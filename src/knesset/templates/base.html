@@ -33,7 +33,7 @@
         {% if LANGUAGE_BIDI %}
         <style>
             #member-photo { float:right; margin:0.5em;}
-        body { padding-top:130px;}
+        body { padding-top:86px;}
         </style>
         <script type="text/javascript" src="{{MEDIA_URL}}js/jquery.min.js"></script>
 
@@ -66,16 +66,6 @@
             {% else %}
                 <li><a href='{% url login %}?next={{request.get_full_path}}'>{% trans 'login' %}</a></li>
             {% endif %}
-                <li>
-                    <a target="_blank" href="https://market.android.com/details?id=org.oknesset">
-                        <img src="/static/img/android_app.png" alt="אייפון" height="51" width="41px">
-                    </a>
-                </li>
-                <li>
-                    <a target="_blank" href="http://itunes.apple.com/us/app/id475096101">
-                        <img src="/static/img/iphone_app.png" alt="אייפון" height="51" width="34px">
-                    </a>
-                </li>
             </ul>
             <ul class="nav">
                 <li id="nav-main" {% block nav-main-page %} {% endblock %}>
