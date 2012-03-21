@@ -11,6 +11,7 @@
 {% load absurl %}
 {% load cache %}
 {% load video %}
+{% load hlp %}
 {% block extratitle %}{{ object.name }}{% endblock %}
 {% block keywords %}{{ object.name }}{% endblock %}
 {% block extrajs %}
@@ -295,6 +296,9 @@
                                         {% else %}
                                             {% trans 'Not enough data' %}
                                         {% endif %}
+                                    </td>
+                                    <td>
+                                        {% ht "נוכחות" %}
                                     </td>
                                 </tr>
                                 <tr>
