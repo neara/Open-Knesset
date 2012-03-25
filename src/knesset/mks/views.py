@@ -174,6 +174,13 @@ class MemberDetailView(DetailView):
 
     model = Member
 
+    get_li_context = classmethod(lambda cls, mk: dict(id = mk.id,
+        name        = mk.name,
+        url         = mk.get_absolute_url(),
+        party_id    = mk.current_party.id,
+        party_name  = mk.current_party.name,
+        ))
+
     def calc_percentile(self,member,outdict,inprop,outvalprop,outpercentileprop):
         all_members = Member.objects.filter(is_current=True)
         member_count = float(all_members.count())
@@ -519,6 +526,11 @@ class PartyListView(ListView):
 
 class PartyDetailView(DetailView):
     model = Party
+
+    get_li_context = classmethod(lambda cls, party: dict(id = party.id,
+        name        = party.name,
+        url         = party.get_absolute_url(),
+        ))
 
     def get_context_data (self, **kwargs):
         context = super(PartyDetailView, self).get_context_data(**kwargs)

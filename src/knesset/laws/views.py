@@ -386,6 +386,18 @@ class VoteDetailView(DetailView):
     model = Vote
     template_resource_name = 'vote'
 
+    get_li_context = classmethod(lambda cls, vote: dict(id = vote.id,
+        time            = vote.time,
+        url             = vote.get_absolute_url(),
+        for_votes_count = vote.for_votes_count(),
+        against_votes_count = vote.against_votes_count(),
+        tags            = vote.tags,
+        members         = map(lambda x: dict(stand=x.type,
+                name    = x.member.name,
+                url     = x.member.get_absolute_url(), 
+            ), VoteAction.objects.filter(vote=vote)),
+        ))
+
     def get_context_data(self, *args, **kwargs):
         context = super(VoteDetailView, self).get_context_data(*args, **kwargs)
         vote = context['vote']

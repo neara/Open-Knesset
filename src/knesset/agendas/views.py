@@ -8,11 +8,16 @@ from django.http import HttpResponseRedirect, HttpResponse, HttpResponseNotAllow
 from django.shortcuts import get_object_or_404, render_to_response, redirect
 from django.core.urlresolvers import reverse
 from django.core.cache import cache
+from django.conf import settings
+
+from simple.views import DetailView as FutureDetailView
 
 from knesset.hashnav import DetailView, ListView, method_decorator
 from knesset.laws.models import Vote
 from knesset.mks.models import Member, Party
 from knesset.api.urls import vote_handler
+from knesset.laws.views import VoteDetailView
+from knesset.mks.views import MemberDetailView, PartyDetailView
 
 from forms import (EditAgendaForm, AddAgendaForm, VoteLinkingFormSet,
                    MeetingLinkingFormSet)
@@ -24,7 +29,7 @@ from django.test import Client
 from django.core.handlers.wsgi import WSGIRequest
 from django.core.cache import cache
 
-logger = logging.getLogger("open-knesset.agendas.views")
+logger = logging.getLogger("agendas.views")
 
 class AgendaListView (ListView):
     def get_queryset(self):
@@ -55,8 +60,10 @@ class AgendaListView (ListView):
         context['parties_lookup']=parties_lookup
         return context
 
-class AgendaDetailView (DetailView):
+class AgendaDetailView (FutureDetailView):
+
     model = Agenda
+
     class ForbiddenAgenda(Exception):
         pass
 
@@ -74,13 +81,53 @@ class AgendaDetailView (DetailView):
         else:
             raise self.ForbiddenAgenda
 
-    def get_context_data(self, *args, **kwargs):
-        context = super(AgendaDetailView, self).get_context_data(*args, **kwargs)
-        agenda = context['object']
-        try:
-            context['title'] = "%s" % agenda.name
-        except AttributeError:
-            context['title'] = _('None')
+    @classmethod
+    def get_mk_li(cls, mk):
+        context = MemberDetailView.get_li_context(mk)
+        context.update(score=mk.score)
+
+    @classmethod
+    def get_party_li(cls, party):
+        context = PartyDetailView.get_li_context(party)
+        context.update(score=party.score)
+
+    @classmethod
+    def get_vote_li(cls, agenda_vote):
+        context = VoteDetailView.get_li_context(agenda_vote.vote)
+        context.update(score = agenda_vote.score,
+               importance = agenda_vote.importance,
+               reasoning = agenda_vote.reasoning)
+
+    def get_context_data(self, object):
+        agenda = object
+        logger.setLevel(logging.DEBUG)
+        cache_key = 'agenda_%s' % agenda.id
+        logger.info('in get_context_data for %s' % cache_key)
+        cached_context = cache.get(cache_key)
+        if not cached_context:
+            try:
+                cached_context = dict (name = unicode(agenda.name),
+                    description = unicode(agenda.description))
+            except AttributeError:
+                pass
+
+            mks = agenda.selected_instances(Member, top=200, bottom=0)
+            cached_context['mks'] = map(self.get_mk_li, mks['top'])
+            parties = agenda.selected_instances(Party, top=20,bottom=0)
+            cached_context['parties'] = map(self.get_party_li, parties['top'])
+            agenda_votes = agenda.agendavotes.order_by('-vote__time')\
+                                             .select_related('vote')
+            cached_context['votes'] = map(self.get_vote_li, agenda_votes)
+
+            cache.set(cache_key, cached_context, settings.LONG_CACHE_TIME)
+
+        context = {}
+        context.update(name             = cached_context['name'],
+                       description      = cached_context['description'],
+                       id               = object.id,
+                       selected_parties = cached_context['parties'],
+                       agenda_votes     = cached_context['votes'])
+
 
         if self.request.user.is_authenticated():
             p = self.request.user.get_profile()
@@ -89,42 +136,18 @@ class AgendaDetailView (DetailView):
         else:
             watched = False
             watched_members = False
-        context.update({'watched_object': watched})
-        context['watched_members'] = watched_members
+
+        context.update(watched_object   = watched ,
+                       watched_members  = watched_members)
 
         all_mks = 'all_mks' in self.request.GET.keys()
         if all_mks:
-            cached_context = cache.get('agenda_mks_%d_all_mks' % agenda.id)
-            if not cached_context:
-                mks = agenda.selected_instances(Member, top=200, bottom=0)
-                cached_context = {'selected_mks':mks['top'],'all_mks':True}
-                cache.set('agenda_mks_%d_all_mks' % agenda.id,
-                          cached_context, 900)
-            context.update(cached_context)
+            context.update(selected_mks = cached_context['mks'], 
+                           all_mks      = True)
         else:
-            cached_context = cache.get('agenda_mks_%d' % agenda.id)
-            if not cached_context:
-                mks = agenda.selected_instances(Member, top=5,bottom=5)
-                cached_context = {'selected_mks_top': mks['top'],
-                                  'selected_mks_bottom': mks['bottom'],
-                                  'all_mks':False}
-                cache.set('agenda_mks_%d' % agenda.id, cached_context, 900)
-            context.update(cached_context)
-
-        cached_context = cache.get('agenda_parties_%d' % agenda.id)
-        if not cached_context:
-            selected_parties = agenda.selected_instances(Party, top=20,bottom=0)['top']
-            cached_context = {'selected_parties': selected_parties }
-            cache.set('agenda_parties_%d' % agenda.id, cached_context, 900)
-        context.update(cached_context)
-
-        cached_context = cache.get('agenda_votes_%d' % agenda.id)
-        if not cached_context:
-            agenda_votes = agenda.agendavotes.order_by('-vote__time')\
-                                             .select_related('vote')
-            cached_context = {'agenda_votes': agenda_votes }
-            cache.set('agenda_votes_%d' % agenda.id, cached_context, 900)
-        context.update(cached_context)
+            context.update(selected_mks_top     = cached_context['mks'][:5],
+                           selected_mks_bottom  = cached_context['mks'][-5:],
+                           all_mks              = False)
 
         return context
 

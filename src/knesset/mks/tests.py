@@ -8,7 +8,7 @@ from django.contrib.sites.models import Site
 from actstream import follow,action
 from actstream.models import Action
 from knesset.mks.models import Member, Party, Membership, MemberAltname
-from knesset.mks.views import MemberListView
+from knesset.mks.views import MemberListView, MemberDetailView
 from knesset.laws.models import Law,Bill,PrivateProposal,Vote,VoteAction
 from knesset.committees.models import CommitteeMeeting,Committee
 from knesset.utils import RequestFactory
@@ -75,6 +75,12 @@ class MemberViewsTest(TestCase):
 
     def testMemberDetail(self):
 
+        # first text the li context is good
+        c = MemberDetailView.get_li_context(self.mk_1)
+        self.assertEqual(c['id'], self.mk_1.id)
+        self.assertEqual(c['name'], self.mk_1.name)
+        self.assertEqual(c['party_id'], self.party_1.id)
+        self.assertEqual(c['party_name'], 'party 1')
         res = self.client.get(reverse('member-detail',
                                       args=[self.mk_1.id]))
         self.assertTemplateUsed(res,
