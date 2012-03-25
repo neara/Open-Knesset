@@ -1,0 +1,3 @@
+[submodule "src/ok-templates"]
+	path = src/ok-templates
+	url = https://daonb@github.com/hasadna/ok-templates.git
