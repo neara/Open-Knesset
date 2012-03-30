@@ -12,6 +12,7 @@ from tagging.models import Tag
 from tagging.utils import calculate_cloud
 from backlinks.pingback.server import default_server
 from actstream import actor_stream
+from django.core.urlresolvers import reverse
 
 from knesset.hashnav.detail import DetailView
 from knesset.mks.models import Member, Party
@@ -19,6 +20,7 @@ from knesset.mks.forms import VerbsForm
 from knesset.mks.utils import percentile
 from knesset.laws.models import MemberVotingStatistics, Bill, VoteAction
 from knesset.agendas.models import Agenda
+from simple.views import DetailView as FutureDetailView
 
 from knesset.video.utils import get_videos_queryset
 from datetime import date, timedelta
@@ -170,10 +172,11 @@ class MemberListView(ListView):
         original_context.update(context)
         return original_context
 
-class MemberDetailView(DetailView):
+class MemberDetailView(FutureDetailView):
 
     model = Member
 
+    # this classmethod is called from AgendaDetailView
     get_li_context = classmethod(lambda cls, mk: dict(id = mk.id,
         name        = mk.name,
         url         = mk.get_absolute_url(),
@@ -203,53 +206,22 @@ class MemberDetailView(DetailView):
                               stattype,
                               '%s_percentile' % stattype)
 
-
-    def get_context_data (self, **kwargs):
-        context = super(MemberDetailView, self).get_context_data(**kwargs)
-        member = context['object']
-        if self.request.user.is_authenticated():
-            p = self.request.user.get_profile()
-            watched = member in p.members
-        else:
-            watched = False
-
-        verbs = None
-        if 'verbs' in self.request.GET:
-            verbs_form = VerbsForm(self.request.GET)
-            if verbs_form.is_valid():
-                verbs = verbs_form.cleaned_data['verbs']
-        if verbs==None:
-            verbs = ('proposed', 'posted')
-            verbs_form = VerbsForm({'verbs': verbs})
-
-        presence = {}
-        self.calc_percentile(member, presence,
-                             'average_weekly_presence_hours',
-                             'average_weekly_presence_hours',
-                             'average_weekly_presence_hours_percentile' )
-        self.calc_percentile(member, presence,
-                             'average_monthly_committee_presence',
-                             'average_monthly_committee_presence',
-                             'average_monthly_committee_presence_percentile' )
-
-        bills_statistics = {}
-        self.calc_bill_stats(member,bills_statistics,'proposed')
-        self.calc_bill_stats(member,bills_statistics,'pre')
-        self.calc_bill_stats(member,bills_statistics,'first')
-        self.calc_bill_stats(member,bills_statistics,'approved')
-
-        bills_tags = Tag.objects.usage_for_queryset(member.bills.all(),counts=True)
-        #bills_tags.sort(key=lambda x:x.count,reverse=True)
-        bills_tags = calculate_cloud(bills_tags)
-
-        if self.request.user.is_authenticated():
+    def get_voteaction_context(self,voteaction):
+        return {
+            'get_type_display':voteaction.get_type_display(),
+            'vote_url':voteaction.vote.get_absolute_url(),
+            'vote_title':voteaction.vote.title,
+        }
+        
+    def get_agendas_context(self,member,is_cached):
+        if not is_cached and self.request.user.is_authenticated():
             agendas = Agenda.objects.get_selected_for_instance(member, user=self.request.user, top=3, bottom=3)
         else:
             agendas = Agenda.objects.get_selected_for_instance(member, user=None, top=3, bottom=3)
         agendas = agendas['top'] + agendas['bottom']
         for agenda in agendas:
             agenda.watched=False
-        if self.request.user.is_authenticated():
+        if not is_cached and self.request.user.is_authenticated():
             watched_agendas = self.request.user.get_profile().agendas
             for watched_agenda in watched_agendas:
                 if watched_agenda in agendas:
@@ -259,50 +231,127 @@ class MemberDetailView(DetailView):
                     watched_agenda.watched = True
                     agendas.append(watched_agenda)
         agendas.sort(key=attrgetter('score'), reverse=True)
+        agendas_objects=agendas
+        agendas=[]
+        for agenda in agendas_objects:
+            agendas.append({
+                'id':agenda.id,
+                'watched':agenda.watched,
+                'agenda-detail-url':reverse('agenda-detail',args=[agenda.id]),
+                'name':agenda.name,
+                'public_owner_name':agenda.public_owner_name,
+                'score':agenda.score,
+                'mk-agenda-detail-url':reverse('mk-agenda-detail',args=[agenda.id,member.id]),
+            })
+        return agendas
 
-        factional_discipline = VoteAction.objects.filter(member = member, against_party=True)
-
-        votes_against_own_bills = VoteAction.objects.filter(member=member,
-                                                            against_own_bill=True)
-
-        general_discipline_params = { 'member' : member }
-        is_coalition = member.current_party.is_coalition
-        if is_coalition:
-            general_discipline_params['against_coalition'] = True
-        else:
-            general_discipline_params['against_opposition'] = True
-        general_discipline = VoteAction.objects.filter(**general_discipline_params)
-
-        about_videos=get_videos_queryset(member,group='about')
-        if (about_videos.count()>0):
-            about_video=about_videos[0]
-            about_video_embed_link=about_video.embed_link
-            about_video_image_link=about_video.image_link
-        else:
-            about_video_embed_link=''
-            about_video_image_link=''
+    def get_context_data (self, object):
+        member=object
+        cache_key = 'member_detail_%s' % member.id
+        context = cache.get(cache_key)
+        if not context:
+            context = {}
+                        
+            bills_statistics = {}
+            self.calc_bill_stats(member,bills_statistics,'proposed')
+            self.calc_bill_stats(member,bills_statistics,'pre')
+            self.calc_bill_stats(member,bills_statistics,'first')
+            self.calc_bill_stats(member,bills_statistics,'approved')
             
-        related_videos=get_videos_queryset(member,group='related')
-        related_videos=related_videos.filter(
-            Q(published__gt=date.today()-timedelta(days=30))
-            | Q(sticky=True)
-        ).order_by('sticky').order_by('-published')[0:5]
+            bills_tags_objects = Tag.objects.usage_for_queryset(member.bills.all(),counts=True)
+            bills_tags_objects = calculate_cloud(bills_tags_objects)
+            bills_tags=[]
+            for bills_tag_object in bills_tags_objects:
+                bills_tags.append({
+                    'url':reverse('bill-tag',args=[bills_tag_object.id]),
+                    'title':unicode(bills_tag_object),
+                    'font_size':bills_tag_object.font_size,
+                })
+                
+            agendas=self.get_agendas_context(member,is_cached=True)
+                
+            presence = {}
+            self.calc_percentile(member, presence,
+                                 'average_weekly_presence_hours',
+                                 'average_weekly_presence_hours',
+                                 'average_weekly_presence_hours_percentile' )
+            self.calc_percentile(member, presence,
+                                 'average_monthly_committee_presence',
+                                 'average_monthly_committee_presence',
+                                 'average_monthly_committee_presence_percentile' )
+            
+            factional_discipline=[]
+            for voteaction in VoteAction.objects.filter(member = member, against_party=True):
+                factional_discipline.append(self.get_voteaction_context(voteaction))
+            
+            votes_against_own_bills=[]
+            for voteaction in VoteAction.objects.filter(member=member, against_own_bill=True):
+                votes_against_own_bills.append(self.get_voteaction_context(voteaction))
+            
+            general_discipline_params = { 'member' : member }
+            is_coalition = member.current_party.is_coalition
+            if is_coalition:
+                general_discipline_params['against_coalition'] = True
+            else:
+                general_discipline_params['against_opposition'] = True
+            general_discipline_objects = VoteAction.objects.filter(**general_discipline_params)
+            general_discipline=[]
+            for voteaction in general_discipline_objects:
+                general_discipline.append(self.get_voteaction_context(voteaction))
+            
+            about_videos=get_videos_queryset(member,group='about')
+            if (about_videos.count()>0):
+                about_video=about_videos[0]
+                about_video_embed_link=about_video.embed_link
+                about_video_image_link=about_video.image_link
+            else:
+                about_video_embed_link=''
+                about_video_image_link=''
+            
+            related_videos=get_videos_queryset(member,group='related')
+            related_videos=related_videos.filter(
+                Q(published__gt=date.today()-timedelta(days=30))
+                | Q(sticky=True)
+            ).order_by('sticky').order_by('-published')[0:5]
+            related_videos_objects=related_videos
+            related_videos=[]
+            for video in related_videos_objects:
+                related_videos.append({
+                    'embed_link':video.embed_link,
+                    'image_link':video.small_image_link,
+                    'title':video.title,
+                    'description':video.description,
+                    'link':video.link,
+                    'published':unicode(video.published),
+                })
+            
+            context.update({
+                    'activity_feed_rss':reverse('member-activity-feed',args=[member.id]),
+                    'bills_statistics':bills_statistics,
+                    'bills_tags':bills_tags,
+                    'agendas':agendas,
+                    'presence':presence,
+                    'factional_discipline':factional_discipline,
+                    'votes_against_own_bills':votes_against_own_bills,
+                    'general_discipline':general_discipline,
+                    'about_video_embed_link':about_video_embed_link,
+                    'about_video_image_link':about_video_image_link,
+                    'related_videos':related_videos,
+                    'num_related_videos':related_videos_objects.count()
+                   })
+        
+        # add non-cached attributes
+        
+        if self.request.user.is_authenticated():
+            p = self.request.user.get_profile()
+            watched = member in p.members
+        else:
+            watched = False
+        context.update({'watched_member': watched})   
+        
+        if self.request.user.is_authenticated():
+            context.update({'agendas':self.get_agendas_context(member,is_cached=False)})
 
-        context.update({'watched_member': watched,
-                'actions': actor_stream(member).filter(verb__in=verbs),
-                'verbs_form': verbs_form,
-                'bills_statistics':bills_statistics,
-                'bills_tags':bills_tags,
-                'agendas':agendas,
-                'presence':presence,
-                'factional_discipline':factional_discipline,
-                'votes_against_own_bills':votes_against_own_bills,
-                'general_discipline':general_discipline,
-                'about_video_embed_link':about_video_embed_link,
-                'about_video_image_link':about_video_image_link,
-                'related_videos':related_videos,
-                'num_related_videos':related_videos.count()
-               })
         return context
 
 class PartyListView(ListView):
