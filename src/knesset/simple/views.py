@@ -33,7 +33,8 @@ class DetailView(JSONResponseMixin, PJAXResponseMixin, SingleObjectTemplateRespo
     def render_to_response(self, context):
         # TODO: needs to route based on the same rules as django-pjax does
         # Look for a 'o=json' GET argument
-        if self.request.GET.get('o','html') == 'json':
+        # make the default json because the html renderer doesn't and shouldn't work because we use node.js
+        if self.request.GET.get('o','json') == 'json':
             return JSONResponseMixin.render_to_response(self, context)
         else:
             return SingleObjectTemplateResponseMixin.render_to_response(self, context)
