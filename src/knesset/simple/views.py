@@ -4,6 +4,7 @@ from django.utils import simplejson as json
 from django.shortcuts import render_to_response
 from django.views.generic.detail import SingleObjectTemplateResponseMixin
 from django.views.generic.detail import BaseDetailView
+from django.views.generic.list import BaseListView
 from djpjax import PJAXResponseMixin
 
 def hello_world(request):
@@ -37,3 +38,6 @@ class DetailView(JSONResponseMixin, PJAXResponseMixin, SingleObjectTemplateRespo
         else:
             return SingleObjectTemplateResponseMixin.render_to_response(self, context)
 
+class ListView(JSONResponseMixin, PJAXResponseMixin, BaseListView):
+    def render_to_response(self, context):
+        return JSONResponseMixin.render_to_response(self, context)

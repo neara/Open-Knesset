@@ -21,8 +21,10 @@ from knesset.mks.utils import percentile
 from knesset.laws.models import MemberVotingStatistics, Bill, VoteAction
 from knesset.agendas.models import Agenda
 from simple.views import DetailView as FutureDetailView
+from simple.views import ListView as FutureListView
 from knesset.laws.templatetags.laws_extra import recent_votes_count, recent_discipline, recent_coalition_discipline
 from knesset.links.views import get_object_links_context
+from knesset.agendas.utils import get_agendas_context_for_model
 
 from knesset.video.utils import get_videos_queryset
 from datetime import date, timedelta
@@ -32,18 +34,15 @@ import logging
 
 logger = logging.getLogger("open-knesset.mks")
 
-class MemberListView(ListView):
+class MemberListView(FutureListView):
 
     model = Member
 
-    def get_template_names(self):
-        info = self.request.GET.get('info','bills_pre')
-        if info=='abc':
-            return ['mks/member_list.html']
-        elif info=='graph':
-            return ['mks/member_graph.html']
-        else:
-            return ['mks/member_list_with_bars.html']
+    def _get_mks_context(self,mks,extra_keys=[]):
+        members=[]
+        for mk in mks:
+            members.append(MemberDetailView.get_li_context(mk,extra_keys=extra_keys))
+        return members
 
     def get_context_data(self, **kwargs):
         info = self.request.GET.get('info','bills_pre')
@@ -58,7 +57,12 @@ class MemberListView(ListView):
         if context:
             original_context.update(context)
             return original_context
-        context['past_mks'] = Member.objects.filter(is_current=False)
+        
+        # because the context here is a bit complicated
+        # I first generate the 'old' context
+        # then at the end convert it into 'new' json serializable context
+        
+        context['past_mks'] =Member.objects.filter(is_current=False) 
 
         context['friend_pages'] = [['.?info=abc',_('By ABC'), False],
                               ['.?info=bills_proposed',_('By number of bills proposed'), False],
@@ -172,19 +176,40 @@ class MemberListView(ListView):
         context['object_list']=qs
         cache.set('object_list_by_%s' % info, context, 900)
         original_context.update(context)
-        return original_context
+        oc=original_context
+        extra_member_keys=['bill_stage','extra']
+        context=(dict(
+            title=oc['title'],
+            friend_pages=oc['friend_pages'],
+            object_list=self._get_mks_context(oc['object_list'],extra_keys=extra_member_keys),
+            # what is member_list and where is it coming from?!?
+            # member_list=self._get_mks_scontext(oc['member_list']),
+            past_mks=self._get_mks_context(oc['past_mks'],extra_keys=extra_member_keys),
+        ))
+        if 'norm_factor' in oc:
+            context['norm_factor']=oc['norm_factor']
+        return context
 
 class MemberDetailView(FutureDetailView):
 
     model = Member
 
-    # this classmethod is called from AgendaDetailView
-    get_li_context = classmethod(lambda cls, mk: dict(id = mk.id,
-        name        = mk.name,
-        url         = mk.get_absolute_url(),
-        party_id    = mk.current_party.id,
-        party_name  = mk.current_party.name,
-        ))
+    @classmethod
+    def get_li_context(cls,member,without_current_party=False,extra_keys=[]):
+        cx=dict(
+            id = member.id,
+            name = member.name,
+            url = member.get_absolute_url(),
+            img_url=member.img_url,
+            role=member.get_role,
+            is_current=member.is_current,
+        )
+        if not without_current_party:
+            cx['current_party']=PartyDetailView.get_li_context(member.current_party)
+        for k in extra_keys:
+            if hasattr(member,k):
+                cx[k]=getattr(member,k)
+        return cx
 
     def calc_percentile(self,member,outdict,inprop,outvalprop,outpercentileprop):
         all_members = Member.objects.filter(is_current=True)
@@ -215,58 +240,18 @@ class MemberDetailView(FutureDetailView):
             'vote_title':voteaction.vote.title,
         }
         
-    def get_agendas_context(self,member,is_cached):
-        if not is_cached and self.request.user.is_authenticated():
-            agendas = Agenda.objects.get_selected_for_instance(member, user=self.request.user, top=3, bottom=3)
-        else:
-            agendas = Agenda.objects.get_selected_for_instance(member, user=None, top=3, bottom=3)
-        agendas = agendas['top'] + agendas['bottom']
-        for agenda in agendas:
-            agenda.watched=False
-        if not is_cached and self.request.user.is_authenticated():
-            watched_agendas = self.request.user.get_profile().agendas
-            for watched_agenda in watched_agendas:
-                if watched_agenda in agendas:
-                    agendas[agendas.index(watched_agenda)].watched = True
-                else:
-                    watched_agenda.score = watched_agenda.member_score(member)
-                    watched_agenda.watched = True
-                    agendas.append(watched_agenda)
-        agendas.sort(key=attrgetter('score'), reverse=True)
-        agendas_objects=agendas
-        agendas=[]
-        for agenda in agendas_objects:
-            agendas.append({
-                'id':agenda.id,
-                'watched':agenda.watched,
-                'agenda-detail-url':reverse('agenda-detail',args=[agenda.id]),
-                'name':agenda.name,
-                'public_owner_name':agenda.public_owner_name,
-                'score':agenda.score,
-                'mk-agenda-detail-url':reverse('mk-agenda-detail',args=[agenda.id,member.id]),
-            })
-        return agendas
-
     def get_context_data (self, object):
         member=object
         cache_key = 'member_detail_%s' % member.id
         context = cache.get(cache_key)
         if not context:
-            context = dict(
-                name=member.name,
+            context=MemberDetailView.get_li_context(member)
+            context.update(dict(
                 backlinks_enabled=member.backlinks_enabled,
                 pingback_url=reverse('pingback-server'),
                 member_trackback=reverse('member-trackback',args=[member.id]),
-                absolute_url=member.get_absolute_url(),
                 title=member.title(),
-                img_url=member.img_url,
-                current_party=dict(
-                    id=member.current_party.id,
-                    party_detail_url=reverse('party-detail',args=[object.current_party.id]),
-                    name=member.current_party.name,
-                    is_coalition=member.current_party.is_coalition,
-                ),
-                role=member.get_role,
+                current_party=PartyDetailView.get_li_context(member.current_party),
                 date_of_death=unicode(member.date_of_death),
                 date_of_birth=unicode(member.date_of_birth),
                 year_of_aliyah=unicode(member.year_of_aliyah),
@@ -275,7 +260,6 @@ class MemberDetailView(FutureDetailView):
                 place_of_residence=member.place_of_residence,
                 residence_centrality=member.residence_centrality,
                 residence_economy=member.residence_economy,
-                is_current=member.is_current,
                 phone=member.phone,
                 fax=member.fax,
                 email=member.email,
@@ -291,7 +275,7 @@ class MemberDetailView(FutureDetailView):
                 committee_meetings_per_month=member.committee_meetings_per_month(),
                 links=get_object_links_context(member),
                 member_trackback_url=reverse('member-trackback',args=[member.id]),
-            )
+            ))
             
             # TODO: add backlinks
             # I douldn't find how to do it
@@ -313,7 +297,7 @@ class MemberDetailView(FutureDetailView):
                     'font_size':bills_tag_object.font_size,
                 })
                 
-            agendas=self.get_agendas_context(member,is_cached=True)
+            agendas=get_agendas_context_for_model(member)
                 
             presence = {}
             self.calc_percentile(member, presence,
@@ -385,6 +369,8 @@ class MemberDetailView(FutureDetailView):
                     'num_related_videos':related_videos_objects.count(),
                     'backlinks':backlinks,
                    })
+            
+            cache.set(cache_key, context, settings.LONG_CACHE_TIME)
         
         # add non-cached attributes
         
@@ -396,13 +382,19 @@ class MemberDetailView(FutureDetailView):
         context.update({'watched_member': watched})   
         
         if self.request.user.is_authenticated():
-            context.update({'agendas':self.get_agendas_context(member,is_cached=False)})
+            context.update({'agendas':get_agendas_context_for_model(member,self.request.user)})
 
         return context
 
-class PartyListView(ListView):
+class PartyListView(FutureListView):
 
     model = Party
+
+    def _get_parties_context(self,parties,extra_keys=[]):
+        ans=[]
+        for party in parties:
+            ans.append(PartyDetailView.get_li_context(party,extra_keys=extra_keys))
+        return ans
 
     def get_context_data(self, **kwargs):
         context = super(PartyListView, self).get_context_data(**kwargs)
@@ -617,44 +609,64 @@ class PartyListView(ListView):
                 context['baseline'] = 0
                 context['title'] = "%s" % (_('Parties by monthly committee meetings'))
 
+            cx=context
+            context=dict(
+                baseline=cx['baseline'],
+                title=cx['title'],
+                norm_factor=cx['norm_factor'],
+                friend_pages=cx['friend_pages'],
+                coalition=self._get_parties_context(cx['coalition'],extra_keys=['extra']),
+                opposition=self._get_parties_context(cx['opposition'],extra_keys=['extra'])
+            )
+
         return context
 
 class PartyDetailView(FutureDetailView):
     model = Party
 
-    get_li_context = classmethod(lambda cls, party: dict(id = party.id,
-        name        = party.name,
-        url         = party.get_absolute_url(),
-        ))
+    @classmethod
+    def get_li_context(cls,party,extra_keys=[]):
+        cx=dict(
+            id = party.id,
+            name = party.name,
+            url = party.get_absolute_url(),
+            is_coalition = party.is_coalition,
+        )
+        for k in extra_keys:
+            if hasattr(party,k):
+                cx[k]=getattr(party,k)
+        return cx
+    
+    def _get_current_members_context(self,party):
+        members=[]
+        for member in party.current_members():
+            members.append(MemberDetailView.get_li_context(member,without_current_party=True))
+        return members
 
     def get_context_data (self, object):
         party=object
         cache_key = 'party_detail_%s' % party.id
         context = cache.get(cache_key)
         if not context:
-            context = {}
-            party = context['object']
-            context['maps_api_key'] = settings.GOOGLE_MAPS_API_KEY
-    
-            if self.request.user.is_authenticated():
-                agendas = Agenda.objects.get_selected_for_instance(party, user=self.request.user, top=3, bottom=3)
-            else:
-                agendas = Agenda.objects.get_selected_for_instance(party, user=None, top=3, bottom=3)
-            agendas = agendas['top'] + agendas['bottom']
-            for agenda in agendas:
-                agenda.watched=False
-            if self.request.user.is_authenticated():
-                watched_agendas = self.request.user.get_profile().agendas
-                for watched_agenda in watched_agendas:
-                    if watched_agenda in agendas:
-                        agendas[agendas.index(watched_agenda)].watched = True
-                    else:
-                        watched_agenda.score = watched_agenda.party_score(party)
-                        watched_agenda.watched = True
-                        agendas.append(watched_agenda)
-            agendas.sort(key=attrgetter('score'), reverse=True)
-    
-            context.update({'agendas':agendas})
+            context = dict(
+                maps_api_key=settings.GOOGLE_MAPS_API_KEY,
+                agendas=get_agendas_context_for_model(party),
+                name=party.name,
+                voting_statistics=dict(
+                    votes_count=party.voting_statistics.votes_count(),
+                    votes_per_seat=party.voting_statistics.votes_per_seat(),
+                    discipline=party.voting_statistics.discipline(),
+                    coalition_discipline=party.voting_statistics.coalition_discipline(),
+                    current_members=self._get_current_members_context(party),
+                ),
+                is_coalition=party.is_coalition,
+                
+            )
+            cache.set(cache_key, context, settings.LONG_CACHE_TIME)
+            
+        if self.request.user.is_authenticated():
+            context['agendas']=get_agendas_context_for_model(party,self.request.user)
+        
         return context
 
 
