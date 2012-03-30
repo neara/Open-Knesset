@@ -721,6 +721,20 @@ class Bill(models.Model):
             action.send(self, verb='was-voted-on-gov', target=g,
                         timestamp=g.date, description=str(g.stand))
 
+    def get_explanation(self):
+
+        if hasattr(self, 'knesset_proposal'):
+            if self.knesset_proposal.get_explanation() != '':
+                return self.knesset_proposal.get_explanation()
+
+        if hasattr(self, 'gov_proposal'):
+            if self.gov_proposal.get_explanation() != '':
+                return self.gov_proposal.get_explanation()
+
+        for proposal in self.proposals.all():
+            if proposal.get_explanation() != '':
+                return proposal.get_explanation()
+
 
 
 class GovLegislationCommitteeDecision(models.Model):

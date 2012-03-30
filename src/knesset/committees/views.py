@@ -77,6 +77,12 @@ class MeetingDetailView(DetailView):
 
     model = CommitteeMeeting
 
+    get_li_context = classmethod(lambda cls, cm: dict(\
+        url = cm.get_absolute_url(),
+        date = unicode(cm.date),
+        topics = cm.topics,
+    ))
+
     def get_context_data(self, *args, **kwargs):
         context = super(MeetingDetailView, self).get_context_data(*args, **kwargs)
         cm = context['object']

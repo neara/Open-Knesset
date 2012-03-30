@@ -227,6 +227,8 @@ class BillViewsTest(TestCase):
 class VoteViewsTest(TestCase):
 
     def setUp(self):
+        from models import VoteAction
+
         self.jacob = User.objects.create_user('jacob', 'jacob@example.com',
                                               'JKM')
         self.adrian = User.objects.create_user('adrian', 'adrian@example.com',
@@ -246,6 +248,11 @@ class VoteViewsTest(TestCase):
         self.ti = TaggedItem._default_manager.create(tag=self.tag_1,
                                                      content_type=ContentType.objects.get_for_model(Vote),
                                                      object_id=self.vote_1.id)
+        self.mk_1 = Member.objects.create(name='mk 1')
+        self.mk_2 = Member.objects.create(name='mk 2')
+        VoteAction.objects.create(member=self.mk_1, vote=self.vote_1, type='for')
+        VoteAction.objects.create(member=self.mk_2, vote=self.vote_1, type='against')
+
 
     def testVoteList(self):
         res = self.client.get(reverse('vote-list'))
@@ -256,6 +263,22 @@ class VoteViewsTest(TestCase):
                          [ self.vote_2.id, self.vote_1.id, ])
 
     def testVoteDetail(self):
+        from views import VoteDetailView
+        # first text the li context is good
+        c = VoteDetailView.get_li_context(self.vote_1)
+        self.assertEqual(c['id'], self.vote_1.id)
+        self.assertEqual(c['title'], "vote 1")
+        self.assertEqual(c['time'], unicode(datetime(2001, 9, 11)))
+        self.assertEqual(c['url'], reverse('vote-detail', 
+                    kwargs=dict(pk = self.vote_1.id)))
+        self.assertEqual(c['for_votes_count'], 1)
+        self.assertEqual(c['against_votes_count'], 1)
+        self.assertEqual(c['tags'], ['tag1'])
+        self.assertEqual(len(c['members']), 2)
+        self.assertIn(dict(name=u"mk 1", stand=u"for", url=self.mk_1.get_absolute_url()),
+                            c['members'])
+        self.assertIn(dict(name=u"mk 2", stand=u"against", url=self.mk_2.get_absolute_url()),
+                            c['members'])
         res = self.client.get(reverse('vote-detail',
                                  kwargs={'pk': self.vote_1.id}))
         self.assertEqual(res.status_code, 200)

@@ -27,7 +27,6 @@ from queries import getAllAgendaPartyVotes
 
 from django.test import Client
 from django.core.handlers.wsgi import WSGIRequest
-from django.core.cache import cache
 
 logger = logging.getLogger("agendas.views")
 
@@ -85,11 +84,13 @@ class AgendaDetailView (FutureDetailView):
     def get_mk_li(cls, mk):
         context = MemberDetailView.get_li_context(mk)
         context.update(score=mk.score)
+        return context
 
     @classmethod
     def get_party_li(cls, party):
         context = PartyDetailView.get_li_context(party)
         context.update(score=party.score)
+        return context
 
     @classmethod
     def get_vote_li(cls, agenda_vote):
@@ -97,37 +98,30 @@ class AgendaDetailView (FutureDetailView):
         context.update(score = agenda_vote.score,
                importance = agenda_vote.importance,
                reasoning = agenda_vote.reasoning)
+        return context
 
     def get_context_data(self, object):
         agenda = object
         logger.setLevel(logging.DEBUG)
         cache_key = 'agenda_%s' % agenda.id
         logger.info('in get_context_data for %s' % cache_key)
-        cached_context = cache.get(cache_key)
-        if not cached_context:
+        context = cache.get(cache_key)
+        if not context:
             try:
-                cached_context = dict (name = unicode(agenda.name),
+               context = dict (name = unicode(agenda.name),
                     description = unicode(agenda.description))
             except AttributeError:
                 pass
 
             mks = agenda.selected_instances(Member, top=200, bottom=0)
-            cached_context['mks'] = map(self.get_mk_li, mks['top'])
+            context['mks'] = map(self.get_mk_li, mks['top'])
             parties = agenda.selected_instances(Party, top=20,bottom=0)
-            cached_context['parties'] = map(self.get_party_li, parties['top'])
+            context['parties'] = map(self.get_party_li, parties['top'])
             agenda_votes = agenda.agendavotes.order_by('-vote__time')\
                                              .select_related('vote')
-            cached_context['votes'] = map(self.get_vote_li, agenda_votes)
+            context['votes'] = map(self.get_vote_li, agenda_votes)
 
-            cache.set(cache_key, cached_context, settings.LONG_CACHE_TIME)
-
-        context = {}
-        context.update(name             = cached_context['name'],
-                       description      = cached_context['description'],
-                       id               = object.id,
-                       selected_parties = cached_context['parties'],
-                       agenda_votes     = cached_context['votes'])
-
+            cache.set(cache_key, context, settings.LONG_CACHE_TIME)
 
         if self.request.user.is_authenticated():
             p = self.request.user.get_profile()
@@ -142,11 +136,11 @@ class AgendaDetailView (FutureDetailView):
 
         all_mks = 'all_mks' in self.request.GET.keys()
         if all_mks:
-            context.update(selected_mks = cached_context['mks'], 
+            context.update(selected_mks = context['mks'], 
                            all_mks      = True)
         else:
-            context.update(selected_mks_top     = cached_context['mks'][:5],
-                           selected_mks_bottom  = cached_context['mks'][-5:],
+            context.update(selected_mks_top     = context['mks'][:5],
+                           selected_mks_bottom  = context['mks'][-5:],
                            all_mks              = False)
 
         return context

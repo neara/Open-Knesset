@@ -1,4 +1,9 @@
 #encoding: utf-8
+import difflib
+import logging
+import datetime
+
+from django.core.cache import cache
 from django.utils.translation import ugettext_lazy
 from django.utils.translation import ugettext as _
 from django.utils import simplejson as json
@@ -27,13 +32,10 @@ from knesset.mks.models import Member
 from knesset.tagvotes.models import TagVote
 from knesset.hashnav import DetailView, ListView
 from knesset.agendas.models import Agenda,UserSuggestedVote
+from mks.views import MemberDetailView
+from committees.views import MeetingDetailView
 
-import urllib
-import urllib2
-import difflib
-import logging
-import datetime
-from time import mktime
+from simple.views import DetailView as FutureDetailView
 
 from forms import VoteSelectForm
 
@@ -161,8 +163,7 @@ def vote_tag(request, tag):
         template_name='laws/vote_list_by_tag.html', extra_context=extra_context)
 
 
-
-class BillDetailView (DetailView):
+class BillDetailView (FutureDetailView):
     allowed_methods = ['get', 'post']
     model = Bill
 
@@ -173,52 +174,52 @@ class BillDetailView (DetailView):
             self.slug_field = "popular_name_slug"
             return super(BillDetailView, self).get_object()
 
-    def get_context_data(self, *args, **kwargs):
-        context = super(BillDetailView, self).get_context_data(*args, **kwargs)
-        bill = context['object']
-        if bill.popular_name:
-            context["keywords"] = bill.popular_name
-        if self.request.user.is_authenticated():
-            p = self.request.user.get_profile()
-            context['watched'] = bill in p.bills
-        else:
-            context['watched'] = False
-        try:
-            kp = bill.knesset_proposal
-            t = kp.law.title + ' ' + kp.title
-            vs = Vote.objects.values('title','id')
-            vs_titles = [v['title'] for v in vs]
-            close_votes = difflib.get_close_matches(t, vs_titles, cutoff=0.5)
-            all_bill_votes = []
-            all_bill_votes.extend(bill.pre_votes.values_list('id',flat=True))
+    def get_context_data(self, object):
+        """ TODO: firstX and not first3"""
+        bill = object
+        cache_key = 'bill_%s' % bill.id
+        context = cache.get(cache_key)
+        if not context:
+            context = {'id': bill.id,
+                    'title': "%s: %s" % (bill.law.title, bill.title),
+                    'url' : bill.get_absolute_url(),
+                    'proposers' : map(MemberDetailView.get_li_context, bill.proposers.all()),
+                    'explanation' : bill.get_explanation(),
+                    }
+
+            #proposal
+            if bill.proposals.count() > 0:
+                proposal = bill.proposals.all()[bill.proposals.count() - 1]
+                context['proposal_date'] = unicode(proposal.date)
+
+            #pre vote
+            pre_vote = None
+            if bill.pre_votes.count() > 0:
+                pre_vote = bill.pre_votes.all()[bill.pre_votes.count() - 1]
+                context['pre_vote'] = VoteDetailView.get_li_context(pre_vote)
+
+            #first_committee_meetings
+            if bill.first_committee_meetings.count() > 0:
+                context['first_committee_meetings'] = \
+                    map(MeetingDetailView.get_li_context, 
+                        bill.first_committee_meetings.all())
+
+            #first vote
             if bill.first_vote:
-                all_bill_votes.append(bill.first_vote.id)
+                context['first_vote'] = VoteDetailView.get_li_context(bill.first_vote)
+
+            #second_committee_meetings
+            if bill.second_committee_meetings.count() > 0:
+                second_committee_meetings = bill.second_committee_meetings.all()[bill.second_committee_meetings.count() - 1]
+                context['second_committee_meetings'] = \
+                    map(CommitteeMeetingDetailView.get_li_context, 
+                        bill.second_committee_meetings.all())
+
+            #second+third vote (approvval_vote
             if bill.approval_vote:
-                all_bill_votes.append(bill.approval_vote.id)
-            close_votes = [(v['id'],v['title']) for v in vs if v['title'] in close_votes and v['id'] not in all_bill_votes]
-            context['close_votes'] = close_votes
-        except Exception, e:
-            pass
-        votes = voting.models.Vote.objects.get_object_votes(bill)
-        if 1 not in votes: votes[1] = 0
-        if -1 not in votes: votes[-1] = 0
-        count = votes[1] + votes[-1]
-        score = {'for': votes[1],
-                 'against': votes[-1],
-                 'total': votes[1] - votes[-1],
-                 'count': count}
-        if count:
-            # use votes/count, with min 10 and max 90
-            score['for_percent'] = min(max(int(float(votes[1]) / count * 99),
-                                           9),
-                                       89)
-            score['against_percent'] = min(max(int(float(votes[-1]) / count * 99),
-                                               9),
-                                           89)
-        else: # 0 votes, use 50:50 width
-            score['for_percent'] = 49
-            score['against_percent'] = 49
-        context['voting_score'] = score
+                context['approval_vote'] = VoteDetailView.get_li_context(bill.approval_vote)
+            cache.set(cache_key, context, settings.LONG_CACHE_TIME)
+
         return context
 
     @method_decorator(login_required)
@@ -387,11 +388,12 @@ class VoteDetailView(DetailView):
     template_resource_name = 'vote'
 
     get_li_context = classmethod(lambda cls, vote: dict(id = vote.id,
-        time            = vote.time,
+        title           = vote.title,
+        time            = unicode(vote.time),
         url             = vote.get_absolute_url(),
         for_votes_count = vote.for_votes_count(),
         against_votes_count = vote.against_votes_count(),
-        tags            = vote.tags,
+        tags            = map(lambda x: unicode(x), vote.tags),
         members         = map(lambda x: dict(stand=x.type,
                 name    = x.member.name,
                 url     = x.member.get_absolute_url(), 
