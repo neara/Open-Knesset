@@ -21,6 +21,8 @@ from knesset.mks.utils import percentile
 from knesset.laws.models import MemberVotingStatistics, Bill, VoteAction
 from knesset.agendas.models import Agenda
 from simple.views import DetailView as FutureDetailView
+from knesset.laws.templatetags.laws_extra import recent_votes_count, recent_discipline, recent_coalition_discipline
+from knesset.links.views import get_object_links_context
 
 from knesset.video.utils import get_videos_queryset
 from datetime import date, timedelta
@@ -250,7 +252,50 @@ class MemberDetailView(FutureDetailView):
         cache_key = 'member_detail_%s' % member.id
         context = cache.get(cache_key)
         if not context:
-            context = {}
+            context = dict(
+                name=member.name,
+                backlinks_enabled=member.backlinks_enabled,
+                pingback_url=reverse('pingback-server'),
+                member_trackback=reverse('member-trackback',args=[member.id]),
+                absolute_url=member.get_absolute_url(),
+                title=member.title(),
+                img_url=member.img_url,
+                current_party=dict(
+                    id=member.current_party.id,
+                    party_detail_url=reverse('party-detail',args=[object.current_party.id]),
+                    name=member.current_party.name,
+                    is_coalition=member.current_party.is_coalition,
+                ),
+                role=member.get_role,
+                date_of_death=unicode(member.date_of_death),
+                date_of_birth=unicode(member.date_of_birth),
+                year_of_aliyah=unicode(member.year_of_aliyah),
+                family_status=member.family_status,
+                place_of_birth=member.place_of_birth,
+                place_of_residence=member.place_of_residence,
+                residence_centrality=member.residence_centrality,
+                residence_economy=member.residence_economy,
+                is_current=member.is_current,
+                phone=member.phone,
+                fax=member.fax,
+                email=member.email,
+                voting_statistics=dict(
+                    votes_count=member.voting_statistics.votes_count(),
+                    discipline=member.voting_statistics.discipline(),
+                    coalition_discipline=member.voting_statistics.coalition_discipline(),
+                ),
+                recent_votes_count=recent_votes_count(member),
+                is_female=member.is_female(),
+                recent_discipline=unicode(recent_discipline(member)),
+                recent_coalition_discipline=unicode(recent_coalition_discipline(member)),
+                committee_meetings_per_month=member.committee_meetings_per_month(),
+                links=get_object_links_context(member),
+                member_trackback_url=reverse('member-trackback',args=[member.id]),
+            )
+            
+            # TODO: add backlinks
+            # I douldn't find how to do it
+            backlinks=[]
                         
             bills_statistics = {}
             self.calc_bill_stats(member,bills_statistics,'proposed')
@@ -337,7 +382,8 @@ class MemberDetailView(FutureDetailView):
                     'about_video_embed_link':about_video_embed_link,
                     'about_video_image_link':about_video_image_link,
                     'related_videos':related_videos,
-                    'num_related_videos':related_videos_objects.count()
+                    'num_related_videos':related_videos_objects.count(),
+                    'backlinks':backlinks,
                    })
         
         # add non-cached attributes
@@ -573,7 +619,7 @@ class PartyListView(ListView):
 
         return context
 
-class PartyDetailView(DetailView):
+class PartyDetailView(FutureDetailView):
     model = Party
 
     get_li_context = classmethod(lambda cls, party: dict(id = party.id,
@@ -581,30 +627,34 @@ class PartyDetailView(DetailView):
         url         = party.get_absolute_url(),
         ))
 
-    def get_context_data (self, **kwargs):
-        context = super(PartyDetailView, self).get_context_data(**kwargs)
-        party = context['object']
-        context['maps_api_key'] = settings.GOOGLE_MAPS_API_KEY
-
-        if self.request.user.is_authenticated():
-            agendas = Agenda.objects.get_selected_for_instance(party, user=self.request.user, top=3, bottom=3)
-        else:
-            agendas = Agenda.objects.get_selected_for_instance(party, user=None, top=3, bottom=3)
-        agendas = agendas['top'] + agendas['bottom']
-        for agenda in agendas:
-            agenda.watched=False
-        if self.request.user.is_authenticated():
-            watched_agendas = self.request.user.get_profile().agendas
-            for watched_agenda in watched_agendas:
-                if watched_agenda in agendas:
-                    agendas[agendas.index(watched_agenda)].watched = True
-                else:
-                    watched_agenda.score = watched_agenda.party_score(party)
-                    watched_agenda.watched = True
-                    agendas.append(watched_agenda)
-        agendas.sort(key=attrgetter('score'), reverse=True)
-
-        context.update({'agendas':agendas})
+    def get_context_data (self, object):
+        party=object
+        cache_key = 'party_detail_%s' % party.id
+        context = cache.get(cache_key)
+        if not context:
+            context = {}
+            party = context['object']
+            context['maps_api_key'] = settings.GOOGLE_MAPS_API_KEY
+    
+            if self.request.user.is_authenticated():
+                agendas = Agenda.objects.get_selected_for_instance(party, user=self.request.user, top=3, bottom=3)
+            else:
+                agendas = Agenda.objects.get_selected_for_instance(party, user=None, top=3, bottom=3)
+            agendas = agendas['top'] + agendas['bottom']
+            for agenda in agendas:
+                agenda.watched=False
+            if self.request.user.is_authenticated():
+                watched_agendas = self.request.user.get_profile().agendas
+                for watched_agenda in watched_agendas:
+                    if watched_agenda in agendas:
+                        agendas[agendas.index(watched_agenda)].watched = True
+                    else:
+                        watched_agenda.score = watched_agenda.party_score(party)
+                        watched_agenda.watched = True
+                        agendas.append(watched_agenda)
+            agendas.sort(key=attrgetter('score'), reverse=True)
+    
+            context.update({'agendas':agendas})
         return context
 
 
