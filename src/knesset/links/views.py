@@ -10,6 +10,7 @@ def get_object_links_context(obj):
             linktype=dict(
                 image=unicode(link.link_type.image),
                 title=link.link_type.title,
+                id=link.link_type.id,
             )
         links.append(dict(
             active=link.active,

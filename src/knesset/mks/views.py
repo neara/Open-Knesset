@@ -22,9 +22,8 @@ from knesset.laws.models import MemberVotingStatistics, Bill, VoteAction
 from knesset.agendas.models import Agenda
 from simple.views import DetailView as FutureDetailView
 from simple.views import ListView as FutureListView
-from knesset.laws.templatetags.laws_extra import recent_votes_count, recent_discipline, recent_coalition_discipline
 from knesset.links.views import get_object_links_context
-from knesset.agendas.utils import get_agendas_context_for_model
+from knesset.agendas.utils import get_agenda_ids_for_model
 
 from knesset.video.utils import get_videos_queryset
 from datetime import date, timedelta
@@ -38,164 +37,26 @@ class MemberListView(FutureListView):
 
     model = Member
 
-    def _get_mks_context(self,mks,extra_keys=[]):
+    @classmethod
+    def get_mks_context(cls,mks):
         members=[]
         for mk in mks:
-            members.append(MemberDetailView.get_li_context(mk,extra_keys=extra_keys))
+            members.append(MemberDetailView.get_li_context(mk))
         return members
 
     def get_context_data(self, **kwargs):
-        info = self.request.GET.get('info','bills_pre')
-        if info not in ['abc','bills_proposed','bills_pre',
-                        'bills_first','bills_approved','votes',
-                        'presence','committees','graph']:
-            raise Http404()
         original_context = super(MemberListView, self).get_context_data(**kwargs)
-        qs = original_context['object_list'].filter(is_current=True)
-
-        context = cache.get('object_list_by_%s' % info) or {}
-        if context:
-            original_context.update(context)
-            return original_context
-        
-        # because the context here is a bit complicated
-        # I first generate the 'old' context
-        # then at the end convert it into 'new' json serializable context
-        
-        context['past_mks'] =Member.objects.filter(is_current=False) 
-
-        context['friend_pages'] = [['.?info=abc',_('By ABC'), False],
-                              ['.?info=bills_proposed',_('By number of bills proposed'), False],
-                              ['.?info=bills_pre',_('By number of bills pre-approved'), False],
-                              ['.?info=bills_first',_('By number of bills first-approved'), False],
-                              ['.?info=bills_approved',_('By number of bills approved'), False],
-                              ['.?info=votes', _('By number of votes per month'), False],
-                              ['.?info=presence', _('By average weekly hours of presence'), False],
-                              ['.?info=committees', _('By average monthly committee meetings'), False],
-                              ['.?info=graph', _('Graphical view'), False]]
-        if info=='abc':
-            context['friend_pages'][0][2] = True
-            context['title'] = _('Members')
-        elif info=='bills_proposed':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.bills.count()
-                x.bill_stage = 'proposed'
-            qs.sort(key=lambda x:x.extra, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.bills.count()
-                x.bill_stage = 'proposed'
-            context['past_mks'].sort(key=lambda x:x.extra, reverse=True)
-            context['friend_pages'][1][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By number of bills proposed'))
-        elif info=='bills_pre':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.bills.filter(Q(stage='2')|Q(stage='3')|Q(stage='4')|Q(stage='5')|Q(stage='6')).count()
-                x.bill_stage = 'pre'
-            qs.sort(key=lambda x:x.extra, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.bills.filter(Q(stage='2')|Q(stage='3')|Q(stage='4')|Q(stage='5')|Q(stage='6')).count()
-                x.bill_stage = 'pre'
-            context['past_mks'].sort(key=lambda x:x.extra, reverse=True)
-            context['friend_pages'][2][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By number of bills pre-approved'))
-        elif info=='bills_first':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.bills.filter(Q(stage='4')|Q(stage='5')|Q(stage='6')).count()
-                x.bill_stage = 'first'
-            qs.sort(key=lambda x:x.extra, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.bills.filter(Q(stage='4')|Q(stage='5')|Q(stage='6')).count()
-                x.bill_stage = 'first'
-            context['past_mks'].sort(key=lambda x:x.extra, reverse=True)
-            context['friend_pages'][3][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By number of bills first-approved'))
-        elif info=='bills_approved':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.bills.filter(stage='6').count()
-                x.bill_stage = 'approved'
-            qs.sort(key=lambda x:x.extra, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.bills.filter(stage='6').count()
-                x.bill_stage = 'approved'
-            context['past_mks'].sort(key=lambda x:x.extra, reverse=True)
-            context['friend_pages'][4][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By number of bills approved'))
-        elif info=='votes':
-            qs = list(qs)
-            vs = list(MemberVotingStatistics.objects.all())
-            vs = dict(zip([x.member_id for x in vs],vs))
-            for x in qs:
-                x.extra = vs[x.id].average_votes_per_month()
-            qs.sort(key=lambda x:x.extra, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.voting_statistics.average_votes_per_month()
-            context['past_mks'].sort(key=lambda x:x.extra, reverse=True)
-            context['friend_pages'][5][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By number of votes per month'))
-        elif info=='presence':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.average_weekly_presence()
-            qs.sort(key=lambda x:x.extra or 0, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.average_weekly_presence()
-            context['past_mks'].sort(key=lambda x:x.extra or 0, reverse=True)
-            context['friend_pages'][6][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By average weekly hours of presence'))
-        elif info=='committees':
-            qs = list(qs)
-            for x in qs:
-                x.extra = x.committee_meetings_per_month()
-            qs.sort(key=lambda x:x.extra or 0, reverse=True)
-            context['past_mks'] = list(context['past_mks'])
-            for x in context['past_mks']:
-                x.extra = x.committee_meetings_per_month()
-            context['past_mks'].sort(key=lambda x:x.extra or 0, reverse=True)
-            context['friend_pages'][7][2] = True
-            context['norm_factor'] = float(qs[0].extra)/50.0
-            context['title'] = "%s %s" % (_('Members'), _('By average monthly committee meetings'))
-        elif info=='graph':
-            context['friend_pages'][8][2] = True
-            context['title'] = "%s %s" % (_('Members'), _('Graphical view'))
-        context['object_list']=qs
-        cache.set('object_list_by_%s' % info, context, 900)
-        original_context.update(context)
-        oc=original_context
-        extra_member_keys=['bill_stage','extra']
-        context=(dict(
-            title=oc['title'],
-            friend_pages=oc['friend_pages'],
-            object_list=self._get_mks_context(oc['object_list'],extra_keys=extra_member_keys),
-            # what is member_list and where is it coming from?!?
-            # member_list=self._get_mks_scontext(oc['member_list']),
-            past_mks=self._get_mks_context(oc['past_mks'],extra_keys=extra_member_keys),
-        ))
-        if 'norm_factor' in oc:
-            context['norm_factor']=oc['norm_factor']
-        return context
+        qs = original_context['object_list']
+        return dict(
+            members=MemberListView.get_mks_context(qs.all())
+        )
 
 class MemberDetailView(FutureDetailView):
 
     model = Member
 
     @classmethod
-    def get_li_context(cls,member,without_current_party=False,extra_keys=[]):
+    def get_li_context(cls,member):
         cx=dict(
             id = member.id,
             name = member.name,
@@ -203,12 +64,19 @@ class MemberDetailView(FutureDetailView):
             img_url=member.img_url,
             role=member.get_role,
             is_current=member.is_current,
+            current_party_id=member.current_party.id,
+            residence_centrality=member.residence_centrality,
+            residence_economy=member.residence_economy,
+            average_weekly_presence=member.average_weekly_presence(),
+            committee_meetings_per_month=member.committee_meetings_per_month(),
+            num_bills=dict(
+                proposed=member.bills.count(),
+                pre=member.bills.filter(Q(stage='2')|Q(stage='3')|Q(stage='4')|Q(stage='5')|Q(stage='6')).count(),
+                first=member.bills.filter(Q(stage='4')|Q(stage='5')|Q(stage='6')).count(),
+                approved=member.bills.filter(stage='6').count(),
+            ),
+            average_votes_per_month=member.voting_statistics.average_votes_per_month(),
         )
-        if not without_current_party:
-            cx['current_party']=PartyDetailView.get_li_context(member.current_party)
-        for k in extra_keys:
-            if hasattr(member,k):
-                cx[k]=getattr(member,k)
         return cx
 
     def calc_percentile(self,member,outdict,inprop,outvalprop,outpercentileprop):
@@ -251,30 +119,25 @@ class MemberDetailView(FutureDetailView):
                 pingback_url=reverse('pingback-server'),
                 member_trackback=reverse('member-trackback',args=[member.id]),
                 title=member.title(),
-                current_party=PartyDetailView.get_li_context(member.current_party),
+                current_party_id=member.current_party.id,
                 date_of_death=unicode(member.date_of_death),
                 date_of_birth=unicode(member.date_of_birth),
                 year_of_aliyah=unicode(member.year_of_aliyah),
                 family_status=member.family_status,
                 place_of_birth=member.place_of_birth,
                 place_of_residence=member.place_of_residence,
-                residence_centrality=member.residence_centrality,
-                residence_economy=member.residence_economy,
                 phone=member.phone,
                 fax=member.fax,
                 email=member.email,
-                voting_statistics=dict(
-                    votes_count=member.voting_statistics.votes_count(),
-                    discipline=member.voting_statistics.discipline(),
-                    coalition_discipline=member.voting_statistics.coalition_discipline(),
-                ),
-                recent_votes_count=recent_votes_count(member),
+                recent_votes_count=member.voting_statistics.votes_count(date.today() - timedelta(30)),
                 is_female=member.is_female(),
-                recent_discipline=unicode(recent_discipline(member)),
-                recent_coalition_discipline=unicode(recent_coalition_discipline(member)),
-                committee_meetings_per_month=member.committee_meetings_per_month(),
+                recent_discipline=member.voting_statistics.discipline(date.today() - timedelta(30)),
+                recent_coalition_discipline=member.voting_statistics.coalition_discipline(date.today() - timedelta(30)),
                 links=get_object_links_context(member),
                 member_trackback_url=reverse('member-trackback',args=[member.id]),
+                votes_count=member.voting_statistics.votes_count(),
+                discipline=member.voting_statistics.discipline(),
+                coalition_discipline=member.voting_statistics.coalition_discipline(),
             ))
             
             # TODO: add backlinks
@@ -289,15 +152,11 @@ class MemberDetailView(FutureDetailView):
             
             bills_tags_objects = Tag.objects.usage_for_queryset(member.bills.all(),counts=True)
             bills_tags_objects = calculate_cloud(bills_tags_objects)
-            bills_tags=[]
+            bills_tag_ids=[]
             for bills_tag_object in bills_tags_objects:
-                bills_tags.append({
-                    'url':reverse('bill-tag',args=[bills_tag_object.id]),
-                    'title':unicode(bills_tag_object),
-                    'font_size':bills_tag_object.font_size,
-                })
+                bills_tag_ids.append(bills_tag_object.id)
                 
-            agendas=get_agendas_context_for_model(member)
+            agenda_ids=get_agenda_ids_for_model(member)
                 
             presence = {}
             self.calc_percentile(member, presence,
@@ -357,8 +216,8 @@ class MemberDetailView(FutureDetailView):
             context.update({
                     'activity_feed_rss':reverse('member-activity-feed',args=[member.id]),
                     'bills_statistics':bills_statistics,
-                    'bills_tags':bills_tags,
-                    'agendas':agendas,
+                    'bills_tag_ids':bills_tag_ids,
+                    'agenda_ids':agenda_ids,
                     'presence':presence,
                     'factional_discipline':factional_discipline,
                     'votes_against_own_bills':votes_against_own_bills,
@@ -382,7 +241,7 @@ class MemberDetailView(FutureDetailView):
         context.update({'watched_member': watched})   
         
         if self.request.user.is_authenticated():
-            context.update({'agendas':get_agendas_context_for_model(member,self.request.user)})
+            context.update({'watched_agenda_ids':get_agenda_ids_for_model(member,self.request.user)})
 
         return context
 
@@ -390,282 +249,85 @@ class PartyListView(FutureListView):
 
     model = Party
 
-    def _get_parties_context(self,parties,extra_keys=[]):
+    @classmethod
+    def get_parties_context(cls,parties):
         ans=[]
         for party in parties:
-            ans.append(PartyDetailView.get_li_context(party,extra_keys=extra_keys))
+            ans.append(PartyDetailView.get_li_context(party))
         return ans
 
     def get_context_data(self, **kwargs):
         context = super(PartyListView, self).get_context_data(**kwargs)
-        qs = context['object_list']
-        info = self.request.GET.get('info','seats')
-        context['coalition'] = qs.filter(is_coalition=True)
-        context['opposition'] = qs.filter(is_coalition=False)
-        context['friend_pages'] = [['.',_('By Number of seats'), False],
-                              ['.?info=votes-per-seat', _('By votes per seat'), False],
-                              ['.?info=discipline', _('By factional discipline'), False],
-                              ['.?info=coalition-discipline', _('By coalition/opposition discipline'), False],
-                              ['.?info=residence-centrality', _('By residence centrality'), False],
-                              ['.?info=residence-economy', _('By residence economy'), False],
-                              ['.?info=bills-proposed', _('By bills proposed'), False],
-                              ['.?info=bills-pre', _('By bills passed pre vote'), False],
-                              ['.?info=bills-first', _('By bills passed first vote'), False],
-                              ['.?info=bills-approved', _('By bills approved'), False],
-                              ['.?info=presence', _('By average weekly hours of presence'), False],
-                              ['.?info=committees', _('By average monthly committee meetings'), False],
-                              ]
-
-        if info:
-            if info=='seats':
-                context['coalition']  =  context['coalition'].annotate(extra=Sum('number_of_seats')).order_by('-extra')
-                context['opposition'] = context['opposition'].annotate(extra=Sum('number_of_seats')).order_by('-extra')
-                context['friend_pages'][0][2] = True
-                context['norm_factor'] = 1
-                context['baseline'] = 0
-                context['title'] = "%s" % (_('Parties'))
-            if info=='votes-per-seat':
-                m = 0
-                for p in context['coalition']:
-                    p.extra = p.voting_statistics.votes_per_seat()
-                    if p.extra > m:
-                        m = p.extra
-                for p in context['opposition']:
-                    p.extra = p.voting_statistics.votes_per_seat()
-                    if p.extra > m:
-                        m = p.extra
-                context['friend_pages'][1][2] = True
-                context['norm_factor'] = m/20
-                context['baseline'] = 0
-                context['title'] = "%s" % (_('Parties'))
-
-            if info=='discipline':
-                m = 100
-                for p in context['coalition']:
-                    p.extra = p.voting_statistics.discipline()
-                    if p.extra < m:
-                        m = p.extra
-                for p in context['opposition']:
-                    p.extra = p.voting_statistics.discipline()
-                    if p.extra < m:
-                        m = p.extra
-                context['friend_pages'][2][2] = True
-                context['norm_factor'] = (100.0-m)/15
-                context['baseline'] = m - 2
-                context['title'] = "%s" % (_('Parties'))
-
-            if info=='coalition-discipline':
-                m = 100
-                for p in context['coalition']:
-                    p.extra = p.voting_statistics.coalition_discipline()
-                    if p.extra < m:
-                        m = p.extra
-                for p in context['opposition']:
-                    p.extra = p.voting_statistics.coalition_discipline()
-                    if p.extra < m:
-                        m = p.extra
-                context['friend_pages'][3][2] = True
-                context['norm_factor'] = (100.0-m)/15
-                context['baseline'] = m - 2
-                context['title'] = "%s" % (_('Parties'))
-
-            if info=='residence-centrality':
-                m = 10
-                for p in context['coalition']:
-                    rc = [member.residence_centrality for member in p.members.all() if member.residence_centrality]
-                    p.extra = round(float(sum(rc))/len(rc),1)
-                    if p.extra < m:
-                        m = p.extra
-                for p in context['opposition']:
-                    rc = [member.residence_centrality for member in p.members.all() if member.residence_centrality]
-                    p.extra = round(float(sum(rc))/len(rc),1)
-                    if p.extra < m:
-                        m = p.extra
-                context['friend_pages'][4][2] = True
-                context['norm_factor'] = (10.0-m)/15
-                context['baseline'] = m-1
-                context['title'] = "%s" % (_('Parties by residence centrality'))
-
-            if info=='residence-economy':
-                m = 10
-                for p in context['coalition']:
-                    rc = [member.residence_economy for member in p.members.all() if member.residence_economy]
-                    p.extra = round(float(sum(rc))/len(rc),1)
-                    if p.extra < m:
-                        m = p.extra
-                for p in context['opposition']:
-                    rc = [member.residence_economy for member in p.members.all() if member.residence_economy]
-                    p.extra = round(float(sum(rc))/len(rc),1)
-                    if p.extra < m:
-                        m = p.extra
-                context['friend_pages'][5][2] = True
-                context['norm_factor'] = (10.0-m)/15
-                context['baseline'] = m-1
-                context['title'] = "%s" % (_('Parties by residence economy'))
-
-            if info=='bills-proposed':
-                m = 9999
-                for p in context['coalition']:
-                    p.extra = len(set(Bill.objects.filter(proposers__current_party=p).values_list('id',flat=True)))/p.number_of_seats
-                    if p.extra < m:
-                        m = p.extra
-                for p in context['opposition']:
-                    p.extra = len(set(Bill.objects.filter(proposers__current_party=p).values_list('id',flat=True)))/p.number_of_seats
-                    if p.extra < m:
-                        m = p.extra
-                context['friend_pages'][6][2] = True
-                context['norm_factor'] = m/2
-                context['baseline'] = 0
-                context['title'] = "%s" % (_('Parties by number of bills proposed per seat'))
-
-            if info=='bills-pre':
-                m = 9999
-                for p in context['coalition']:
-                    p.extra = round(float(len(set(Bill.objects.filter(Q(proposers__current_party=p),Q(stage='2')|Q(stage='3')|Q(stage='4')|Q(stage='5')|Q(stage='6')).values_list('id',flat=True))))/p.number_of_seats,1)
-                    if p.extra < m:
-                        m = p.extra
-                for p in context['opposition']:
-                    p.extra = round(float(len(set(Bill.objects.filter(Q(proposers__current_party=p),Q(stage='2')|Q(stage='3')|Q(stage='4')|Q(stage='5')|Q(stage='6')).values_list('id',flat=True))))/p.number_of_seats,1)
-                    if p.extra < m:
-                        m = p.extra
-                context['friend_pages'][7][2] = True
-                context['norm_factor'] = m/2
-                context['baseline'] = 0
-                context['title'] = "%s" % (_('Parties by number of bills passed pre vote per seat'))
-
-            if info=='bills-first':
-                m = 9999
-                for p in context['coalition']:
-                    p.extra = round(float(len(set(Bill.objects.filter(Q(proposers__current_party=p),Q(stage='4')|Q(stage='5')|Q(stage='6')).values_list('id',flat=True))))/p.number_of_seats,1)
-                    if p.extra < m:
-                        m = p.extra
-                for p in context['opposition']:
-                    p.extra = round(float(len(set(Bill.objects.filter(Q(proposers__current_party=p),Q(stage='4')|Q(stage='5')|Q(stage='6')).values_list('id',flat=True))))/p.number_of_seats,1)
-                    if p.extra < m:
-                        m = p.extra
-                context['friend_pages'][8][2] = True
-                context['norm_factor'] = m/2
-                context['baseline'] = 0
-                context['title'] = "%s" % (_('Parties by number of bills passed first vote per seat'))
-
-            if info=='bills-approved':
-                m = 9999
-                for p in context['coalition']:
-                    p.extra = round(float(len(set(Bill.objects.filter(proposers__current_party=p,stage='6').values_list('id',flat=True))))/p.number_of_seats,1)
-                    if p.extra < m:
-                        m = p.extra
-                for p in context['opposition']:
-                    p.extra = round(float(len(set(Bill.objects.filter(proposers__current_party=p,stage='6').values_list('id',flat=True))))/p.number_of_seats,1)
-                    if p.extra < m:
-                        m = p.extra
-                context['friend_pages'][9][2] = True
-                context['norm_factor'] = m/2
-                context['baseline'] = 0
-                context['title'] = "%s" % (_('Parties by number of bills passed approved per seat'))
-
-            if info=='presence':
-                m = 9999
-                for p in context['coalition']:
-                    awp = [member.average_weekly_presence() for member in p.members.all() if member.average_weekly_presence()]
-                    if awp:
-                        p.extra = round(float(sum(awp))/len(awp),1)
-                    else:
-                        p.extra = 0
-                    if p.extra < m:
-                        m = p.extra
-                for p in context['opposition']:
-                    awp = [member.average_weekly_presence() for member in p.members.all() if member.average_weekly_presence()]
-                    if awp:
-                        p.extra = round(float(sum(awp))/len(awp),1)
-                    else:
-                        p.extra = 0
-                    if p.extra < m:
-                        m = p.extra
-                context['friend_pages'][10][2] = True
-                context['norm_factor'] = m/2
-                context['baseline'] = 0
-                context['title'] = "%s" % (_('Parties by average weekly hours of presence'))
-
-            if info=='committees':
-                m = 9999
-                for p in context['coalition']:
-                    cmpm = [member.committee_meetings_per_month() for member in p.members.all() if member.committee_meetings_per_month()]
-                    if cmpm:
-                        p.extra = round(float(sum(cmpm))/len(cmpm),1)
-                    else:
-                        p.extra = 0
-                    if p.extra < m:
-                        m = p.extra
-                for p in context['opposition']:
-                    cmpm = [member.committee_meetings_per_month() for member in p.members.all() if member.committee_meetings_per_month()]
-                    if cmpm:
-                        p.extra = round(float(sum(cmpm))/len(cmpm),1)
-                    else:
-                        p.extra = 0
-                    if p.extra < m:
-                        m = p.extra
-                context['friend_pages'][11][2] = True
-                context['norm_factor'] = m/2
-                context['baseline'] = 0
-                context['title'] = "%s" % (_('Parties by monthly committee meetings'))
-
-            cx=context
-            context=dict(
-                baseline=cx['baseline'],
-                title=cx['title'],
-                norm_factor=cx['norm_factor'],
-                friend_pages=cx['friend_pages'],
-                coalition=self._get_parties_context(cx['coalition'],extra_keys=['extra']),
-                opposition=self._get_parties_context(cx['opposition'],extra_keys=['extra'])
-            )
-
-        return context
+        return dict(
+            parties=PartyListView.get_parties_context(context['object_list'])
+        )
 
 class PartyDetailView(FutureDetailView):
     model = Party
 
     @classmethod
-    def get_li_context(cls,party,extra_keys=[]):
+    def get_li_context(cls,party,without_members=False):
         cx=dict(
             id = party.id,
             name = party.name,
             url = party.get_absolute_url(),
             is_coalition = party.is_coalition,
+            number_of_seats = party.number_of_seats,
+            votes_per_seat=party.voting_statistics.votes_per_seat(),
+            discipline=party.voting_statistics.discipline(),
+            coalition_discipline=party.voting_statistics.coalition_discipline(),
+            num_bills=dict(
+                proposed=Bill.objects.filter(proposers__current_party=party).count(),
+                pre=Bill.objects.filter(Q(proposers__current_party=party),Q(stage='2')|Q(stage='3')|Q(stage='4')|Q(stage='5')|Q(stage='6')).count(),
+                first=Bill.objects.filter(Q(proposers__current_party=party),Q(stage='4')|Q(stage='5')|Q(stage='6')).count(),
+                approved=Bill.objects.filter(proposers__current_party=party,stage='6').count(),
+            ),
+            member_ids=PartyDetailView.get_member_ids(party)
         )
-        for k in extra_keys:
-            if hasattr(party,k):
-                cx[k]=getattr(party,k)
+        rc = [member.residence_centrality for member in party.members.all() if member.residence_centrality]
+        if len(rc)>0:
+            cx['average_residence_centrality']=float(sum(rc))/len(rc)
+        else:
+            cx['average_residence_centrality']=0
+        rc = [member.residence_economy for member in party.members.all() if member.residence_economy]
+        if len(rc)>0:
+            cx['average_residence_economy']=float(sum(rc))/len(rc)
+        else:
+            cx['average_residence_economy']=0
+        awp = [member.average_weekly_presence() for member in party.members.all() if member.average_weekly_presence()]
+        if len(awp)>0:
+            cx['average_weekly_presence']=float(sum(awp))/len(awp)
+        else:
+            cx['average_weekly_presence']=0
+        cmpm = [member.committee_meetings_per_month() for member in party.members.all() if member.committee_meetings_per_month()]
+        if len(cmpm)>0:
+            cx['average_committee_meetings_per_month']=float(sum(cmpm))/len(cmpm)
+        else:
+            cx['average_committee_meetings_per_month']=0
         return cx
     
-    def _get_current_members_context(self,party):
-        members=[]
-        for member in party.current_members():
-            members.append(MemberDetailView.get_li_context(member,without_current_party=True))
-        return members
+    @classmethod
+    def get_member_ids(self,party):
+        member_ids=[]
+        for member in party.members.all():
+            member_ids.append(member.id)
+        return member_ids
 
     def get_context_data (self, object):
         party=object
         cache_key = 'party_detail_%s' % party.id
         context = cache.get(cache_key)
         if not context:
-            context = dict(
+            context = PartyDetailView.get_li_context(party)
+            context.update(dict(
                 maps_api_key=settings.GOOGLE_MAPS_API_KEY,
-                agendas=get_agendas_context_for_model(party),
-                name=party.name,
-                voting_statistics=dict(
-                    votes_count=party.voting_statistics.votes_count(),
-                    votes_per_seat=party.voting_statistics.votes_per_seat(),
-                    discipline=party.voting_statistics.discipline(),
-                    coalition_discipline=party.voting_statistics.coalition_discipline(),
-                    current_members=self._get_current_members_context(party),
-                ),
-                is_coalition=party.is_coalition,
-                
-            )
+                agendas=get_agenda_ids_for_model(party),
+            ))
+            context['votes_count']=party.voting_statistics.votes_count()
             cache.set(cache_key, context, settings.LONG_CACHE_TIME)
             
         if self.request.user.is_authenticated():
-            context['agendas']=get_agendas_context_for_model(party,self.request.user)
+            context['watched_agendas']=get_agenda_ids_for_model(party,self.request.user)
         
         return context
 

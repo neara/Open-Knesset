@@ -2,6 +2,14 @@ from operator import attrgetter
 from models import Agenda
 from django.core.urlresolvers import reverse
 
+def get_agenda_ids_for_model(obj,user=None):
+    agendas=get_agendas_context_for_model(obj,user)
+    agenda_ids=[]
+    for agenda in agendas:
+        if user is None or agenda['watched']:
+            agenda_ids.append(agenda['id'])
+    return agenda_ids
+
 def get_agendas_context_for_model(obj,user=None):
     # do this import here to prevent some kind of circular import
     from knesset.agendas.views import AgendaDetailView
