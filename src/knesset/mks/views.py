@@ -64,7 +64,7 @@ class MemberDetailView(FutureDetailView):
             img_url=member.img_url,
             role=member.get_role,
             is_current=member.is_current,
-            current_party_id=member.current_party.id,
+            party=member.current_party.id,
             residence_centrality=member.residence_centrality,
             residence_economy=member.residence_economy,
             average_weekly_presence=member.average_weekly_presence(),
