@@ -70,7 +70,7 @@ class AgendaDetailView (FutureDetailView):
     def get_li_context(cls,agenda):
         return dict(
             id=agenda.id,
-            agenda_detail_url=agenda.get_absolute_url(),
+            url=agenda.get_absolute_url(),
             name=agenda.name,
             public_owner_name=agenda.public_owner_name,
         )
