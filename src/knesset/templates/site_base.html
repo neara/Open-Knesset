@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% load i18n %}
+
+{% block extrajs %}
+<script type="text/javascript" src="{{MEDIA_URL}}js/site_base.js"></script>
+{% endblock %}
 {% block content-main %}
   <div style="display:none;"> 
     <span id="message_login">
