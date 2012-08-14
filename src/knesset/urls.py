@@ -2,7 +2,6 @@ from django.conf import settings
 from django.conf.urls.defaults import *
 from django.contrib import admin
 from django.views.generic.simple import redirect_to, direct_to_template
-from django.views.decorators.cache import cache_page
 
 from planet import views as planet_views
 from hitcount.views import update_hit_count_ajax
