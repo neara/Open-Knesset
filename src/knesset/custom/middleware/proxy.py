@@ -1,6 +1,10 @@
 import urllib2
 from django.http import HttpResponse
-from django.core.urlresolvers import resolve
+from django.core.cache import cache
+from custom.help import MyHTMLParser
+
+
+logger = logging.getLogger('knesset.custom.middleware')
 
 
 class ProxyMiddleware(object):
@@ -20,11 +24,17 @@ class ProxyMiddleware(object):
         if identifier in request.path:
             
             url = "http://dev.oknesset.org%s" % request.path
-            
+            resp = cache.get(url)
+            if resp is not None:
+                logger.info('%s found in cache' % url)
+                return HttpResponse(resp.read())
+
             try:
                 fp = urllib2.urlopen(url)
-                #TODO validate all href attr
-                
-                return HttpResponse(fp.read())
+                validator = MyHTMLParser(fp) #validating all hrefs
+                if validator.status():
+                    logger.info('caching %s' % url)
+                    cache.set(url, fp)
+                    return HttpResponse(fp.read())
             except urllib2.URLError:
-                print 'error'
+                logger.warning('Failed to retrieve: %s!' % url)

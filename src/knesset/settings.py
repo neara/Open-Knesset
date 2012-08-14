@@ -67,9 +67,9 @@ TEMPLATE_LOADERS = (
 MIDDLEWARE_CLASSES = (
     'django.middleware.gzip.GZipMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'knesset.custom.middleware.proxy.ProxyMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'knesset.custom.middleware.proxy.ProxyMiddleware',
     'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware', # keep after session
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -131,6 +131,7 @@ INSTALLED_APPS = (
     'compressor',
     'social_auth',
     'devserver',
+    'knesset.custom',
     'knesset',
     'knesset.auxiliary',                  # knesset apps
     'knesset.mks',
@@ -150,7 +151,7 @@ INSTALLED_APPS = (
     'knesset.video',
     'knesset.okhelptexts',
     'tastypie',
-    'knesset.custom',
+
 )
 
 TEMPLATE_CONTEXT_PROCESSORS = (
