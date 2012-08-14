@@ -1,4 +1,5 @@
 from HTMLParser import HTMLParser
+import urllib2
 from django.core.urlresolvers import resolve
 from django.http import Http404
 
@@ -23,11 +24,22 @@ class MyHTMLParser(HTMLParser):
                 try:
                     match = resolve(v)
                 except Http404:
-                    self.is_good = False
-                    return
+                    self.is_good = self._check_abs_url(v)
+            if not self.is_good:
+                return
 
     def status(self):
         """
         Indicator if all links in current html are working
         """
         return self.is_good
+
+    def _check_abs_url(self, url):
+        """
+        Checks if a given url can be opened
+        """
+        try:
+            f = urllib2.urlopen(url)
+            return True
+        except urllib2.URLError:
+            return False
