@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block extrajs %}
+<script type="text/javascript" src="{{MEDIA_URL}}js/site_base.js"></script>
+{% endblock %}
+{% block content-main %}
+  <div style="display:none;"> 
+    <span id="message_login">
+        {% trans "You have to be logged in to enable the watch feature." %}<br>
+        <a href="{% url login %}?next={{ request.get_full_path }}">{% trans "login" %}</a>
+        {% trans "or" %}
+        <a href="{% url register %}?next={{ request.get_full_path }}">{% trans "register" %}</a>
+    </span>
+    {% block messages %}{% endblock %}
+  </div>
+    <div id="subnav">{% block subnav %} {% endblock %}</div>
+    {% block header %} {% endblock %}
+	<div>
+		{% block divcontent %} {% block content %}ahm.. my child should replace this block{% endblock %}{% endblock %}
+	</div>
+{% endblock %}
+
+
