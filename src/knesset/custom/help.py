@@ -9,7 +9,7 @@ class MyHTMLParser(HTMLParser):
         fp is an input stream returned by open() or urllib2.urlopen()
         """
         HTMLParser.__init__(self)
-        self.seen = {}
+        self.seen = {}  # holds parsed hrefs
         self.is_good = True
         self.feed(fp.read())
 
@@ -30,13 +30,14 @@ class MyHTMLParser(HTMLParser):
 
     def status(self):
         """
-        Indicator if all links in current html are working
+        Indicator if all links in current html are working.
+        Returns True if no broken links found.
         """
         return self.is_good
 
     def _check_abs_url(self, url):
         """
-        Checks if a given url can be opened
+        Checks if the link is broken
         """
         try:
             f = urllib2.urlopen(url)

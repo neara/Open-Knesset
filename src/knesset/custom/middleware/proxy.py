@@ -12,7 +12,7 @@ class ProxyMiddleware(object):
     """
     Checks if a requested url has new identifier and if true
     redirects the request to dev server. On successful response from
-    dev, renders the response
+    dev, validates all links and returns HTTPResponse
     """
     
     def process_request(self, request):
@@ -20,9 +20,8 @@ class ProxyMiddleware(object):
         """
         Checking for identifier and redirecting to dev server
         """
-        identifier = u'new'
         
-        if identifier in request.path:
+        if request.GET.get('new') == 'true':
             
             url = "http://dev.oknesset.org%s" % request.path
             resp = cache.get(url)
